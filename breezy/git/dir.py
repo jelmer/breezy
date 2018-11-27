@@ -39,6 +39,7 @@ from ..controldir import (
     BranchReferenceLoop,
     ControlDir,
     ControlDirFormat,
+    Converter,
     format_registry,
     RepositoryAcquisitionPolicy,
     )
@@ -116,6 +117,12 @@ class GitDir(ControlDir):
 
     def checkout_metadir(self, stacked=False):
         return format_registry.make_controldir("git")
+
+    def check_conversion_target(self, target_format):
+        if not target_format.repository_format.rich_root_data:
+            raise brz_errors.BadConversionTarget(
+                'Does not support rich root data.', target_format,
+                from_format=self._format)
 
     def _get_selected_ref(self, branch, ref=None):
         if ref is not None and branch is not None:
@@ -712,3 +719,70 @@ class LocalGitDir(GitDir):
             commondir = commondir.rstrip(b'/.git/').decode(osutils._fs_enc)
             return ControlDir.open_from_transport(
                 get_transport_from_path(commondir))
+
+
+class GitToBzrConverter(Converter):
+
+    @classmethod
+    def is_compatible(cls, source_format, target_format):
+        from breezy.bzr.bzrdir import BzrDirFormat
+        return (isinstance(target_format, BzrDirFormat) and
+                isinstance(source_format, GitControlDirFormat))
+
+    def copy_contents(self, source, target, pb):
+        from .branch import LocalGitBranch
+        from .refs import ref_to_branch_name
+        from ..repository import InterRepository
+        try:
+            target_repo = target.find_repository()
+        except brz_errors.NoRepositoryPresent:
+            target_repo = target.create_repository(shared=True)
+
+        if not target_repo.supports_rich_root():
+            raise brz_errors.BadConversionTarget(
+                "Target repository doesn't support rich roots",
+                target._format, source._format)
+
+        source_repo = source.find_repository()
+
+        interrepo = InterRepository.get(source_repo, target_repo)
+        mapping = source_repo.get_mapping()
+        refs = interrepo.fetch()
+        for i, (name, sha) in enumerate(viewitems(refs)):
+            try:
+                branch_name = ref_to_branch_name(name)
+            except ValueError:
+                # Not a branch, ignore
+                continue
+            if pb is not None:
+                pb.update("creating branches", i, len(refs))
+            if (getattr(target_controldir._format, "colocated_branches",
+                        False) and colocated):
+                if name == "HEAD":
+                    branch_name = None
+                head_branch = self._get_colocated_branch(
+                    target_controldir, branch_name)
+            else:
+                head_branch = self._get_nested_branch(
+                    dest_transport, dest_format, branch_name)
+            revid = mapping.revision_id_foreign_to_bzr(sha)
+            source_branch = LocalGitBranch(
+                source_repo.controldir, source_repo, sha)
+            if head_branch.last_revision() != revid:
+                head_branch.generate_revision_history(revid)
+            source_branch.tags.merge_to(head_branch.tags)
+            if not head_branch.get_parent():
+                url = urlutils.join_segment_parameters(
+                    source_branch.base,
+                    {"branch": urlutils.escape(branch_name)})
+                head_branch.set_parent(url)
+
+    def convert(self, to_convert, target_format, pb):
+        target = target_format.initialize_on_transport(
+            to_convert.root_transport)
+        self.copy_contents(to_convert, target, pb)
+        return target
+
+
+Converter.register_converter(GitToBzrConverter)
+

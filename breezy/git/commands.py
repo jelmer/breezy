@@ -81,9 +81,9 @@ class cmd_git_import(Command):
             ControlDir,
             )
         from ..errors import (
+            BadConversionTarget,
             BzrError,
             BzrCommandError,
-            NoRepositoryPresent,
             NotBranchError,
             )
         from ..i18n import gettext
@@ -94,9 +94,6 @@ class cmd_git_import(Command):
         from ..transport import get_transport
         from .branch import (
             LocalGitBranch,
-            )
-        from .refs import (
-            ref_to_branch_name,
             )
         from .repository import GitRepository
 
@@ -118,49 +115,15 @@ class cmd_git_import(Command):
         except NotBranchError:
             target_controldir = dest_format.initialize_on_transport_ex(
                 dest_transport, shared_repo=True)[1]
-        try:
-            target_repo = target_controldir.find_repository()
-        except NoRepositoryPresent:
-            target_repo = target_controldir.create_repository(shared=True)
 
-        if not target_repo.supports_rich_root():
-            raise BzrCommandError(
-                gettext("Target repository doesn't support rich roots"))
+        from breezy.git.dir import GitToBzrConverter
+        with ui.ui_factory.nested_progress_bar() as pb:
+            try:
+                GitToBzrConverter().copy_contents(
+                    source_repo.controldir, target, pb)
+            except BadConversionTarget as e:
+                raise BzrCommandError(e)
 
-        interrepo = InterRepository.get(source_repo, target_repo)
-        mapping = source_repo.get_mapping()
-        refs = interrepo.fetch()
-        pb = ui.ui_factory.nested_progress_bar()
-        try:
-            for i, (name, sha) in enumerate(viewitems(refs)):
-                try:
-                    branch_name = ref_to_branch_name(name)
-                except ValueError:
-                    # Not a branch, ignore
-                    continue
-                pb.update(gettext("creating branches"), i, len(refs))
-                if (getattr(target_controldir._format, "colocated_branches",
-                            False) and colocated):
-                    if name == "HEAD":
-                        branch_name = None
-                    head_branch = self._get_colocated_branch(
-                        target_controldir, branch_name)
-                else:
-                    head_branch = self._get_nested_branch(
-                        dest_transport, dest_format, branch_name)
-                revid = mapping.revision_id_foreign_to_bzr(sha)
-                source_branch = LocalGitBranch(
-                    source_repo.controldir, source_repo, sha)
-                if head_branch.last_revision() != revid:
-                    head_branch.generate_revision_history(revid)
-                source_branch.tags.merge_to(head_branch.tags)
-                if not head_branch.get_parent():
-                    url = urlutils.join_segment_parameters(
-                        source_branch.base,
-                        {"branch": urlutils.escape(branch_name)})
-                    head_branch.set_parent(url)
-        finally:
-            pb.finished()
         trace.note(gettext(
             "Use 'bzr checkout' to create a working tree in "
             "the newly created branches."))
