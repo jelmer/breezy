@@ -729,6 +729,24 @@ class GitToBzrConverter(Converter):
         return (isinstance(target_format, BzrDirFormat) and
                 isinstance(source_format, GitControlDirFormat))
 
+    def _get_colocated_branch(self, target_controldir, name):
+        try:
+            return target_controldir.open_branch(name=name)
+        except brz_errors.NotBranchError:
+            return target_controldir.create_branch(name=name)
+
+    def _get_nested_branch(self, dest_transport, dest_format, name):
+        head_transport = dest_transport.clone(name)
+        try:
+            head_controldir = ControlDir.open_from_transport(head_transport)
+        except brz_errors.NotBranchError:
+            head_controldir = dest_format.initialize_on_transport_ex(
+                head_transport, create_prefix=True)[1]
+        try:
+            return head_controldir.open_branch()
+        except brz_errors.NotBranchError:
+            return head_controldir.create_branch()
+
     def copy_contents(self, source, target, pb):
         from .branch import LocalGitBranch
         from .refs import ref_to_branch_name
@@ -756,12 +774,10 @@ class GitToBzrConverter(Converter):
                 continue
             if pb is not None:
                 pb.update("creating branches", i, len(refs))
-            if (getattr(target_controldir._format, "colocated_branches",
-                        False) and colocated):
-                if name == "HEAD":
+            if target._format.colocated_branches:
+                if name == b"HEAD":
                     branch_name = None
-                head_branch = self._get_colocated_branch(
-                    target_controldir, branch_name)
+                head_branch = self._get_colocated_branch(target, branch_name)
             else:
                 head_branch = self._get_nested_branch(
                     dest_transport, dest_format, branch_name)
@@ -772,17 +788,62 @@ class GitToBzrConverter(Converter):
                 head_branch.generate_revision_history(revid)
             source_branch.tags.merge_to(head_branch.tags)
             if not head_branch.get_parent():
+                params = {}
+                if branch_name:
+                    params["branch"] = urlutils.escape(branch_name)
                 url = urlutils.join_segment_parameters(
                     source_branch.base,
-                    {"branch": urlutils.escape(branch_name)})
+                    params)
                 head_branch.set_parent(url)
 
     def convert(self, to_convert, target_format, pb):
         target = target_format.initialize_on_transport(
             to_convert.root_transport)
         self.copy_contents(to_convert, target, pb)
+        target.create_checkout()
         return target
 
 
 Converter.register_converter(GitToBzrConverter)
 
+
+class BzrToGitConverter(Converter):
+
+    @classmethod
+    def is_compatible(cls, source_format, target_format):
+        from breezy.bzr.bzrdir import BzrDirFormat
+        return (isinstance(source_format, BzrDirFormat) and
+                isinstance(target_format, GitControlDirFormat))
+
+    def convert(self, to_convert, target_format, pb):
+        from ..repository import InterRepository
+        from .refs import branch_name_to_ref, tag_name_to_ref
+        target = target_format.initialize_on_transport(
+            to_convert.root_transport)
+        interrepo = InterRepository.get(
+            to_convert.find_repository(),
+            target.find_repository())
+        def update_refs(old_refs):
+            refs = {}
+            for branch in to_convert.list_branches():
+                refs[branch_name_to_ref(branch.name)] = (None, branch.last_revision())
+                for tag_name, revid in viewitems(branch.tags.get_tag_dict()):
+                    refs[tag_name_to_ref(tag_name)] = (None, revid)
+            return refs
+        interrepo.fetch_refs(update_refs, lossy=True)
+        # Stage the open files
+        try:
+            wt = to_convert.open_workingtree()
+        except brz_errors.NoWorkingTree:
+            pass
+        else:
+            target_wt = target.open_workingtree()
+            with target_wt.lock_tree_write():
+                for path, versioned, kind, file_id, ie in wt.list_files():
+                    if not versioned or kind == 'directory':
+                        continue
+                    target_wt._index_add_entry(path, kind)
+        return target
+
+
+Converter.register_converter(BzrToGitConverter)

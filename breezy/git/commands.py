@@ -48,27 +48,6 @@ class cmd_git_import(Command):
         Option('colocated', help='Create colocated branches.'),
         ]
 
-    def _get_colocated_branch(self, target_controldir, name):
-        from ..errors import NotBranchError
-        try:
-            return target_controldir.open_branch(name=name)
-        except NotBranchError:
-            return target_controldir.create_branch(name=name)
-
-    def _get_nested_branch(self, dest_transport, dest_format, name):
-        from ..controldir import ControlDir
-        from ..errors import NotBranchError
-        head_transport = dest_transport.clone(name)
-        try:
-            head_controldir = ControlDir.open_from_transport(head_transport)
-        except NotBranchError:
-            head_controldir = dest_format.initialize_on_transport_ex(
-                head_transport, create_prefix=True)[1]
-        try:
-            return head_controldir.open_branch()
-        except NotBranchError:
-            return head_controldir.create_branch()
-
     def run(self, src_location, dest_location=None, colocated=False):
         import os
         from .. import (
