@@ -235,17 +235,17 @@ def _tree_to_objects(tree, parent_trees, idmap, unusual_modes,
             except errors.NoSuchId:
                 pass
             else:
-                pkind = ptree.kind(ppath, file_id)
+                pkind = ptree.kind(ppath)
                 if kind == "file":
                     if (pkind == "file" and
-                            ptree.get_file_sha1(ppath, file_id) == other):
+                            ptree.get_file_sha1(ppath) == other):
                         return (
-                            file_id, ptree.get_file_revision(ppath, file_id))
+                            file_id, ptree.get_file_revision(ppath))
                 if kind == "symlink":
                     if (pkind == "symlink" and
-                            ptree.get_symlink_target(ppath, file_id) == other):
+                            ptree.get_symlink_target(ppath) == other):
                         return (
-                            file_id, ptree.get_file_revision(ppath, file_id))
+                            file_id, ptree.get_file_revision(ppath))
         raise KeyError
 
     # Find all the changed blobs
@@ -338,7 +338,7 @@ def _tree_to_objects(tree, parent_trees, idmap, unusual_modes,
             except KeyError:
                 # no-change merge ?
                 blob = Blob()
-                blob.data = tree.get_file_text(path, ie.file_id)
+                blob.data = tree.get_file_text(path)
                 if add_cache_entry is not None:
                     add_cache_entry(blob, (ie.file_id, ie.revision), path)
                 return blob.id
