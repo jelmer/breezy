@@ -73,11 +73,6 @@ class TestFormat5(TestCaseWithTransport):
         dir = controldir.ControlDir.open(self.get_url())
         check_dir_components_use_same_lock(dir)
 
-    def test_can_convert(self):
-        # format 5 dirs are convertable
-        dir = BzrDirFormat5().initialize(self.get_url())
-        self.assertTrue(dir.can_convert_format())
-
     def test_needs_conversion(self):
         # format 5 dirs need a conversion if they are not the default,
         # and they aren't
@@ -107,11 +102,6 @@ class TestFormat6(TestCaseWithTransport):
         # and if we open it normally.
         dir = controldir.ControlDir.open(self.get_url())
         check_dir_components_use_same_lock(dir)
-
-    def test_can_convert(self):
-        # format 6 dirs are convertable
-        dir = BzrDirFormat6().initialize(self.get_url())
-        self.assertTrue(dir.can_convert_format())
 
     def test_needs_conversion(self):
         # format 6 dirs need an conversion if they are not the default.

@@ -37,9 +37,6 @@ class DarcsUnsupportedError(errors.UnsupportedFormatError):
 class DarcsDirFormat(controldir.ControlDirFormat):
     """Darcs directory format."""
 
-    def get_converter(self):
-        raise NotImplementedError(self.get_converter)
-
     def get_format_description(self):
         return "darcs control directory"
 

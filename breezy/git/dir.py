@@ -107,9 +107,6 @@ class GitDir(ControlDir):
     def is_supported(self):
         return True
 
-    def can_convert_format(self):
-        return False
-
     def break_lock(self):
         # There are no global locks, so nothing to break.
         raise NotImplementedError(self.break_lock)

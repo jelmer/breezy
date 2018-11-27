@@ -869,10 +869,6 @@ class BzrDirMeta1(BzrDir):
             self.control_transport, self._format._lock_file_name,
             self._format._lock_class)
 
-    def can_convert_format(self):
-        """See BzrDir.can_convert_format()."""
-        return True
-
     def create_branch(self, name=None, repository=None,
                       append_revisions_only=None):
         """See ControlDir.create_branch."""
@@ -1612,21 +1608,6 @@ class BzrDirMetaFormat1(BzrDirFormat):
                              ' using format:\n  %s'),
                      new_branch_format.get_format_description())
 
-    def get_converter(self, format=None):
-        """See BzrDirFormat.get_converter()."""
-        if format is None:
-            format = BzrDirFormat.get_default_format()
-        if (isinstance(self, BzrDirMetaFormat1)
-                and isinstance(format, BzrDirMetaFormat1Colo)):
-            return ConvertMetaToColo(format)
-        if (isinstance(self, BzrDirMetaFormat1Colo)
-                and isinstance(format, BzrDirMetaFormat1)):
-            return ConvertMetaToColo(format)
-        if not isinstance(self, format.__class__):
-            # converting away from metadir is not implemented
-            raise NotImplementedError(self.get_converter)
-        return ConvertMetaToMeta(format)
-
     @classmethod
     def get_format_string(cls):
         """See BzrDirFormat.get_format_string()."""
@@ -1720,29 +1701,27 @@ class BzrDirMetaFormat1Colo(BzrDirMetaFormat1):
         return BzrDirMeta1(transport, format)
 
 
-class ConvertMetaToMeta(controldir.Converter):
+class ConvertMetaContents(controldir.Converter):
     """Converts the components of metadirs."""
 
-    def __init__(self, target_format):
-        """Create a metadir to metadir converter.
+    @classmethod
+    def is_compatible(cls, source_format, target_format):
+        return (isinstance(source_format, BzrDirMetaFormat1) and
+                isinstance(target_format, BzrDirMetaFormat1) and
+                source_format.get_format_string() == target_format.get_format_string())
 
-        :param target_format: The final metadir format that is desired.
-        """
-        self.target_format = target_format
-
-    def convert(self, to_convert, pb):
+    def convert(self, to_convert, target_format, pb):
         """See Converter.convert()."""
-        self.controldir = to_convert
         self.pb = ui.ui_factory.nested_progress_bar()
         self.count = 0
         self.total = 1
         self.step('checking repository format')
         try:
-            repo = self.controldir.open_repository()
+            repo = to_convert.open_repository()
         except errors.NoRepositoryPresent:
             pass
         else:
-            repo_fmt = self.target_format.repository_format
+            repo_fmt = target_format.repository_format
             if not isinstance(repo._format, repo_fmt.__class__):
                 from ..repository import CopyConverter
                 ui.ui_factory.note(gettext('starting repository conversion'))
@@ -1750,14 +1729,14 @@ class ConvertMetaToMeta(controldir.Converter):
                     raise AssertionError(
                         "Repository in metadir does not support "
                         "overriding transport")
-                converter = CopyConverter(self.target_format.repository_format)
+                converter = CopyConverter(target_format.repository_format)
                 converter.convert(repo, pb)
-        for branch in self.controldir.list_branches():
+        for branch in to_convert.list_branches():
             # TODO: conversions of Branch and Tree should be done by
             # InterXFormat lookups/some sort of registry.
             # Avoid circular imports
             old = branch._format.__class__
-            new = self.target_format.get_branch_format().__class__
+            new = target_format.get_branch_format().__class__
             while old != new:
                 if (old == fullhistorybranch.BzrBranchFormat5
                     and new in (_mod_bzrbranch.BzrBranchFormat6,
@@ -1775,10 +1754,10 @@ class ConvertMetaToMeta(controldir.Converter):
                     raise errors.BadConversionTarget("No converter", new,
                                                      branch._format)
                 branch_converter.convert(branch)
-                branch = self.controldir.open_branch()
+                branch = to_convert.open_branch()
                 old = branch._format.__class__
         try:
-            tree = self.controldir.open_workingtree(recommend_upgrade=False)
+            tree = to_convert.open_workingtree(recommend_upgrade=False)
         except (errors.NoWorkingTree, errors.NotLocalUrl):
             pass
         else:
@@ -1786,56 +1765,48 @@ class ConvertMetaToMeta(controldir.Converter):
             # InterXFormat lookups
             if (isinstance(tree, workingtree_3.WorkingTree3)
                 and not isinstance(tree, workingtree_4.DirStateWorkingTree)
-                and isinstance(self.target_format.workingtree_format,
+                and isinstance(target_format.workingtree_format,
                                workingtree_4.DirStateWorkingTreeFormat)):
                 workingtree_4.Converter3to4().convert(tree)
             if (isinstance(tree, workingtree_4.DirStateWorkingTree)
                 and not isinstance(tree, workingtree_4.WorkingTree5)
-                and isinstance(self.target_format.workingtree_format,
+                and isinstance(target_format.workingtree_format,
                                workingtree_4.WorkingTreeFormat5)):
                 workingtree_4.Converter4to5().convert(tree)
             if (isinstance(tree, workingtree_4.DirStateWorkingTree)
                 and not isinstance(tree, workingtree_4.WorkingTree6)
-                and isinstance(self.target_format.workingtree_format,
+                and isinstance(target_format.workingtree_format,
                                workingtree_4.WorkingTreeFormat6)):
                 workingtree_4.Converter4or5to6().convert(tree)
         self.pb.finished()
         return to_convert
 
 
-class ConvertMetaToColo(controldir.Converter):
-    """Add colocated branch support."""
-
-    def __init__(self, target_format):
-        """Create a converter.that upgrades a metadir to the colo format.
-
-        :param target_format: The final metadir format that is desired.
-        """
-        self.target_format = target_format
-
-    def convert(self, to_convert, pb):
-        """See Converter.convert()."""
-        to_convert.transport.put_bytes('branch-format',
-                                       self.target_format.as_string())
-        return BzrDir.open_from_transport(to_convert.root_transport)
+controldir.Converter.register_converter(ConvertMetaContents)
 
 
 class ConvertMetaToColo(controldir.Converter):
-    """Convert a 'development-colo' bzrdir to a '2a' bzrdir."""
+    """Convert a 'development-colo' bzrdir to a '2a' bzrdir and vice versa.
+    """
 
-    def __init__(self, target_format):
-        """Create a converter that converts a 'development-colo' metadir
-        to a '2a' metadir.
+    @classmethod
+    def is_compatible(self, source_format, target_format):
+        if (isinstance(source_format, BzrDirMetaFormat1)
+                and isinstance(target_format, BzrDirMetaFormat1Colo)):
+            return True
+        if (isinstance(source_format, BzrDirMetaFormat1Colo)
+                and isinstance(target_format, BzrDirMetaFormat1)):
+            return True
+        return False
 
-        :param target_format: The final metadir format that is desired.
-        """
-        self.target_format = target_format
-
-    def convert(self, to_convert, pb):
+    def convert(self, to_convert, target_format, pb):
         """See Converter.convert()."""
         to_convert.transport.put_bytes('branch-format',
-                                       self.target_format.as_string())
+                                       target_format.as_string())
         return BzrDir.open_from_transport(to_convert.root_transport)
+
+
+controldir.Converter.register_converter(ConvertMetaToColo)
 
 
 class CreateRepository(controldir.RepositoryAcquisitionPolicy):

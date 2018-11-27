@@ -1440,7 +1440,7 @@ class TestMeta1DirColoFormat(TestCaseWithTransport):
         format = bzrdir.BzrDirMetaFormat1Colo()
         self.assertTrue(tree.controldir.needs_format_conversion(format))
         converter = tree.controldir._format.get_converter(format)
-        result = converter.convert(tree.controldir, None)
+        result = converter.convert(tree.controldir, format, None)
         self.assertIsInstance(result._format, bzrdir.BzrDirMetaFormat1Colo)
         self.assertFalse(result.needs_format_conversion(format))
 
@@ -1449,16 +1449,16 @@ class TestMeta1DirColoFormat(TestCaseWithTransport):
         format = bzrdir.BzrDirMetaFormat1()
         self.assertTrue(tree.controldir.needs_format_conversion(format))
         converter = tree.controldir._format.get_converter(format)
-        result = converter.convert(tree.controldir, None)
+        result = converter.convert(tree.controldir, format, None)
         self.assertIsInstance(result._format, bzrdir.BzrDirMetaFormat1)
         self.assertFalse(result.needs_format_conversion(format))
 
     def test_downgrade_to_2a_too_many_branches(self):
         tree = self.make_branch_and_tree('.', format='development-colo')
         tree.controldir.create_branch(name="another-colocated-branch")
-        converter = tree.controldir._format.get_converter(
-            bzrdir.BzrDirMetaFormat1())
-        result = converter.convert(tree.controldir, bzrdir.BzrDirMetaFormat1())
+        target_format = bzrdir.BzrDirMetaFormat1()
+        converter = tree.controldir._format.get_converter(target_format)
+        result = converter.convert(tree.controldir, target_format, None)
         self.assertIsInstance(result._format, bzrdir.BzrDirMetaFormat1)
 
     def test_nested(self):

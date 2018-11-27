@@ -39,9 +39,6 @@ class CVSUnsupportedError(errors.UnsupportedFormatError):
 class CVSDirFormat(controldir.ControlDirFormat):
     """The CVS directory control format."""
 
-    def get_converter(self):
-        raise NotImplementedError(self.get_converter)
-
     def get_format_description(self):
         return "CVS control directory."
 

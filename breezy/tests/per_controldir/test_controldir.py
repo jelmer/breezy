@@ -1580,12 +1580,11 @@ class TestControlDir(TestCaseWithControlDir):
     def test_can_and_needs_format_conversion(self):
         # check that we can ask an instance if its upgradable
         dir = self.make_controldir('.')
-        if dir.can_convert_format():
-            # if its default updatable there must be an updater
-            # (we force the latest known format as downgrades may not be
-            # available
+        try:
             self.assertTrue(isinstance(dir._format.get_converter(
                 format=dir._format), controldir.Converter))
+        except errors.BadConversionTarget:
+            pass  # No converter available
         dir.needs_format_conversion(
             controldir.ControlDirFormat.get_default_format())
 
@@ -1618,14 +1617,13 @@ class TestControlDir(TestCaseWithControlDir):
         dir.create_repository()
         dir.create_branch()
         self.createWorkingTreeOrSkip(dir)
-        if dir.can_convert_format():
-            # if its default updatable there must be an updater
-            # (we force the latest known format as downgrades may not be
-            # available
+        try:
             with ui.ui_factory.nested_progress_bar() as pb:
-                dir._format.get_converter(format=dir._format).convert(dir, pb)
+                dir._format.get_converter(format=dir._format).convert(dir, dir._format, pb)
             # and it should pass 'check' now.
             check.check_dwim(self.get_url('.'), False, True, True)
+        except errors.BadConversionTarget:
+            pass  # no converter available
 
     def test_format_description(self):
         dir = self.make_controldir('.')

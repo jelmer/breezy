@@ -39,9 +39,6 @@ class MonotoneUnsupportedError(errors.UnsupportedFormatError):
 class MonotoneDirFormat(controldir.ControlDirFormat):
     """Monotone directory format."""
 
-    def get_converter(self):
-        raise NotImplementedError(self.get_converter)
-
     def get_format_description(self):
         return "Monotone control directory"
 

@@ -126,11 +126,6 @@ class BzrDirFormat5(BzrDirFormatAllInOne):
         """See ControlDirFormat.get_format_description()."""
         return "All-in-one format 5"
 
-    def get_converter(self, format=None):
-        """See ControlDirFormat.get_converter()."""
-        # there is one and only one upgrade path here.
-        return ConvertBzrDir5To6()
-
     def _initialize_for_clone(self, url):
         return self.initialize_on_transport(get_transport(url), _cloning=True)
 
@@ -190,11 +185,6 @@ class BzrDirFormat6(BzrDirFormatAllInOne):
         from .branch import BzrBranchFormat4
         return BzrBranchFormat4()
 
-    def get_converter(self, format=None):
-        """See ControlDirFormat.get_converter()."""
-        # there is one and only one upgrade path here.
-        return ConvertBzrDir6ToMeta()
-
     def _initialize_for_clone(self, url):
         return self.initialize_on_transport(get_transport(url), _cloning=True)
 
@@ -236,7 +226,15 @@ class ConvertBzrDir4To5(Converter):
         self.text_count = 0
         self.revisions = {}
 
-    def convert(self, to_convert, pb):
+    @classmethod
+    def is_compatible(cls, source_format, target_format):
+        if not isinstance(target_format, BzrDirFormat5):
+            return False
+        if not isinstance(source_format, BzrDirFormat4):
+            return False
+        return True
+
+    def convert(self, to_convert, target_format, pb):
         """See Converter.convert()."""
         self.controldir = to_convert
         if pb is not None:
@@ -294,7 +292,7 @@ class ConvertBzrDir4To5(Converter):
         self._cleanup_spare_files_after_format4()
         self.branch._transport.put_bytes(
             'branch-format',
-            BzrDirFormat5().get_format_string(),
+            target_format.get_format_string(),
             mode=self.controldir._get_file_mode())
 
     def _cleanup_spare_files_after_format4(self):
@@ -504,7 +502,15 @@ class ConvertBzrDir4To5(Converter):
 class ConvertBzrDir5To6(Converter):
     """Converts format 5 bzr dirs to format 6."""
 
-    def convert(self, to_convert, pb):
+    @classmethod
+    def is_compatible(cls, source_format, target_format):
+        if not isinstance(source_format, BzrDirFormat5):
+            return False
+        if not isinstance(source_format, BzrDirFormat6):
+            return False
+        return True
+
+    def convert(self, to_convert, target_format, pb):
         """See Converter.convert()."""
         self.controldir = to_convert
         with ui.ui_factory.nested_progress_bar() as pb:
@@ -538,14 +544,22 @@ class ConvertBzrDir5To6(Converter):
                     store_transport.move(filename, new_name)
         self.controldir.transport.put_bytes(
             'branch-format',
-            BzrDirFormat6().get_format_string(),
+            target_format.get_format_string(),
             mode=self.controldir._get_file_mode())
 
 
 class ConvertBzrDir6ToMeta(Converter):
     """Converts format 6 bzr dirs to metadirs."""
 
-    def convert(self, to_convert, pb):
+    @classmethod
+    def is_compatible(cls, source_format, target_format):
+        if not isinstance(source_format, BzrDirFormat6):
+            return False
+        if not isinstance(target_format, BzrDirMetaFormat1):
+            return False
+        return True
+
+    def convert(self, to_convert, target_format, pb):
         """See Converter.convert()."""
         from .repository import RepositoryFormat7
         from ...bzr.fullhistory import BzrBranchFormat5
@@ -634,7 +648,7 @@ class ConvertBzrDir6ToMeta(Converter):
                     'checkout/last-revision', last_revision)
         self.controldir.transport.put_bytes(
             'branch-format',
-            BzrDirMetaFormat1().get_format_string(),
+            target_format.get_format_string(),
             mode=self.file_mode)
         self.pb.finished()
         return ControlDir.open(self.controldir.user_url)
@@ -691,11 +705,6 @@ class BzrDirFormat4(BzrDirFormat):
     def get_format_description(self):
         """See ControlDirFormat.get_format_description()."""
         return "All-in-one format 4"
-
-    def get_converter(self, format=None):
-        """See ControlDirFormat.get_converter()."""
-        # there is one and only one upgrade path here.
-        return ConvertBzrDir4To5()
 
     def initialize_on_transport(self, transport):
         """Format 4 branches cannot be created."""
@@ -1000,3 +1009,8 @@ class BzrDir6(BzrDirPreSplitOut):
         # bzrdir as a whole
         from .workingtree import WorkingTreeFormat2
         return WorkingTreeFormat2().open(self, _found=True)
+
+
+Converter.register_converter(ConvertBzrDir4To5)
+Converter.register_converter(ConvertBzrDir5To6)
+Converter.register_converter(ConvertBzrDir6ToMeta)

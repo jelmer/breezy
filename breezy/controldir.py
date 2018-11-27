@@ -118,11 +118,6 @@ class ControlDir(ControlComponent):
     API users to check for magic attributes to see what features are supported.
     """
 
-    def can_convert_format(self):
-        """Return true if this controldir is one whose format we can convert
-        from."""
-        return True
-
     def list_branches(self):
         """Return a sequence of all branches local to this control directory.
 
@@ -990,17 +985,37 @@ class ControlComponentFormatRegistry(registry.FormatRegistry):
 class Converter(object):
     """Converts a disk format object from one format to another."""
 
-    def convert(self, to_convert, pb):
+    _converters = []
+
+    def convert(self, to_convert, target_format, pb):
         """Perform the conversion of to_convert, giving feedback via pb.
 
         :param to_convert: The disk object to convert.
+        :param target_format: The target format
         :param pb: a progress bar to use for progress information.
         """
+        raise NotImplementedError(self.convert)
 
     def step(self, message):
         """Update the pb by a step."""
         self.count += 1
         self.pb.update(message, self.count, self.total)
+
+    @classmethod
+    def is_compatible(cls, source_format, target_format):
+        raise NotImplementedError(cls.is_compatible)
+
+    @classmethod
+    def register_converter(cls, converter):
+        cls._converters.append(converter)
+
+    @classmethod
+    def get_converter(cls, source_format, target_format):
+        for converter in cls._converters:
+            if converter.is_compatible(source_format, target_format):
+                return converter()
+        raise errors.BadConversionTarget(
+            "no converter available", target_format, source_format)
 
 
 class ControlDirFormat(object):
@@ -1070,7 +1085,9 @@ class ControlDirFormat(object):
         :param format: Optional format to override the default format of the
                        library.
         """
-        raise NotImplementedError(self.get_converter)
+        if format is None:
+            format = ControlDirFormat.get_default_format()
+        return Converter.get_converter(self, format)
 
     def is_supported(self):
         """Is this format supported?

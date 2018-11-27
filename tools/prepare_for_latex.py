@@ -41,6 +41,7 @@ IMAGE_DIRECTIVE_PATTERN = re.compile(u'^..\\s+image::\\s+(.*)\`\s+$')
 DIRECTIVE_ELEMENT_PATTERN = re.compile(u'^\\s+:[^:]+:\\s+')
 
 class Converter(object):
+
     def __init__(self, srcdir, destdir):
         self.srcdir = srcdir
         self.destdir = destdir

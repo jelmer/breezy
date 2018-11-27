@@ -932,10 +932,6 @@ class RemoteBzrDir(_mod_bzrdir.BzrDir, _RpcHelper):
         self._ensure_real()
         return self._real_bzrdir.get_workingtree_transport(workingtree_format)
 
-    def can_convert_format(self):
-        """Upgrading of remote bzrdirs is not supported yet."""
-        return False
-
     def needs_format_conversion(self, format):
         """Upgrading of remote bzrdirs is not supported yet."""
         return False

@@ -46,11 +46,15 @@ class OldBzrDir(bzrdir.BzrDirMeta1):
 class ConvertOldTestToMeta(controldir.Converter):
     """A trivial converter, used for testing."""
 
-    def convert(self, to_convert, pb):
+    @classmethod
+    def is_compatible(cls, source_format, target_format):
+        return True
+
+    def convert(self, to_convert, target_format, pb):
         ui.ui_factory.note('starting upgrade from old test format to 2a')
         to_convert.control_transport.put_bytes(
             'branch-format',
-            bzrdir.BzrDirMetaFormat1().get_format_string(),
+            target_format.get_format_string(),
             mode=to_convert._get_file_mode())
         return controldir.ControlDir.open(to_convert.user_url)
 
@@ -58,9 +62,6 @@ class ConvertOldTestToMeta(controldir.Converter):
 class OldBzrDirFormat(bzrdir.BzrDirMetaFormat1):
 
     _lock_class = lockable_files.TransportLock
-
-    def get_converter(self, format=None):
-        return ConvertOldTestToMeta()
 
     @classmethod
     def get_format_string(cls):
@@ -131,6 +132,7 @@ class TestWithUpgradableBranches(TestCaseWithTransport):
 
     def test_upgrade_control_dir(self):
         old_format = OldBzrDirFormat()
+        self.overrideAttr(controldir.Converter, '_converters', [ConvertOldTestToMeta])
         self.addCleanup(bzr.BzrProber.formats.remove,
                         old_format.get_format_string())
         bzr.BzrProber.formats.register(old_format.get_format_string(),

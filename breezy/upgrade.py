@@ -32,6 +32,11 @@ from .i18n import gettext
 from .bzr.remote import RemoteBzrDir
 
 
+class UpgradeReadonly(errors.BzrError):
+
+    _fmt = "Upgrade URL cannot work with readonly URLs."
+
+
 class Convert(object):
 
     def __init__(self, url=None, format=None, control_dir=None):
@@ -60,7 +65,7 @@ class Convert(object):
             self.controldir._ensure_real()
             self.controldir = self.controldir._real_bzrdir
         if self.controldir.root_transport.is_readonly():
-            raise errors.UpgradeReadonly
+            raise UpgradeReadonly
         self.transport = self.controldir.root_transport
         ui.ui_factory.suppressed_warnings.add(warning_id)
         try:
@@ -96,9 +101,6 @@ class Convert(object):
             format = self.format
         if not self.controldir.needs_format_conversion(format):
             raise errors.UpToDateFormat(self.controldir._format)
-        if not self.controldir.can_convert_format():
-            raise errors.BzrError(gettext("cannot upgrade from bzrdir format %s") %
-                                  self.controldir._format)
         self.controldir.check_conversion_target(format)
         ui.ui_factory.note(gettext('starting upgrade of %s') %
                            urlutils.unescape_for_display(self.transport.base, 'utf-8'))
@@ -106,7 +108,7 @@ class Convert(object):
         self.backup_oldpath, self.backup_newpath = self.controldir.backup_bzrdir()
         while self.controldir.needs_format_conversion(format):
             converter = self.controldir._format.get_converter(format)
-            self.controldir = converter.convert(self.controldir, None)
+            self.controldir = converter.convert(self.controldir, format, None)
         ui.ui_factory.note(gettext('finished'))
 
     def clean_up(self):

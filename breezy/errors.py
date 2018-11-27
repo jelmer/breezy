@@ -922,11 +922,6 @@ class TokenMismatch(LockBroken):
         self.lock_token = lock_token
 
 
-class UpgradeReadonly(BzrError):
-
-    _fmt = "Upgrade URL cannot work with readonly URLs."
-
-
 class UpToDateFormat(BzrError):
 
     _fmt = "The branch format %(format)s is already at the most recent format."
