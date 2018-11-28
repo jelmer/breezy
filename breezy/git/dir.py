@@ -747,7 +747,7 @@ class GitToBzrConverter(Converter):
         except brz_errors.NotBranchError:
             return head_controldir.create_branch()
 
-    def copy_contents(self, source, target, pb):
+    def copy_contents(self, source, target, pb, colocated=True):
         from .branch import LocalGitBranch
         from .refs import ref_to_branch_name
         from ..repository import InterRepository
@@ -775,13 +775,13 @@ class GitToBzrConverter(Converter):
                 continue
             if pb is not None:
                 pb.update("creating branches", i, len(refs))
-            if target._format.colocated_branches:
+            if target._format.colocated_branches and colocated:
                 if name == b"HEAD":
                     branch_name = None
                 head_branch = self._get_colocated_branch(target, branch_name)
             else:
                 head_branch = self._get_nested_branch(
-                    dest_transport, dest_format, branch_name)
+                    target.root_transport, target._format, branch_name)
             revid = mapping.revision_id_foreign_to_bzr(sha)
             source_branch = LocalGitBranch(
                 source_repo.controldir, source_repo, sha)

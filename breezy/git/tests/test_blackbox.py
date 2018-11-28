@@ -386,3 +386,56 @@ class GrepTests(ExternalBase):
         output, error = self.run_bzr('grep text')
         self.assertEqual(output, 'a:text for a\n')
         self.assertEqual(error, '')
+
+
+class UpgradeTests(ExternalBase):
+
+    def build_test_history(self, format):
+        tree = self.make_branch_and_tree('.', format=format)
+        self.build_tree_contents([('a', 'text for a\n')])
+        tree.add(['a'])
+        tree.commit('foo')
+        return tree
+
+    def test_git_to_bzr(self):
+        self.build_test_history(format='git')
+        output, error = self.run_bzr('upgrade --bzr')
+        self.assertContainsRe(
+            output,
+            'Upgrading branch .* ...\n'
+            'starting upgrade of .*\n'
+            'finished\n')
+        self.assertEqual('', error)
+        self.assertEqual({'a', '.git.backup', '.bzr'}, set(os.listdir('.')))
+        output, error = self.run_bzr('status')
+        self.assertEqual(
+            'unknown:\n'
+            '  .git.backup/\n',
+            output)
+        self.assertEqual('', error)
+
+    def test_bzr_to_git(self):
+        self.build_test_history(format='bzr')
+        output, error = self.run_bzr('upgrade --git')
+        self.assertContainsRe(
+            output,
+            'Upgrading branch .* ...\n'
+            'starting upgrade of .*\n'
+            'making backup of .*\n'
+            '  to .*\n'
+            'finished\n')
+        self.assertEqual('', error)
+        self.assertEqual({'a', 'backup.bzr.~1~', '.git'}, set(os.listdir('.')))
+        self.knownFailure("empty directories are shown as added")
+        output, error = self.run_bzr('status')
+        self.assertEqual('', output)
+        self.assertEqual('', error)
+
+    def test_git_to_git(self):
+        self.build_test_history(format='git')
+        output, error = self.run_bzr('upgrade --git')
+        self.assertEqual(
+            'The branch format Local Git Repository is already at the '
+            'most recent format.', output.splitlines()[-1])
+        self.assertEqual('', error)
+        self.assertEqual({'.git', 'a'}, set(os.listdir('.')))

@@ -99,7 +99,8 @@ class cmd_git_import(Command):
         with ui.ui_factory.nested_progress_bar() as pb:
             try:
                 GitToBzrConverter().copy_contents(
-                    source_repo.controldir, target, pb)
+                    source_repo.controldir, target_controldir, pb,
+                    colocated=colocated)
             except BadConversionTarget as e:
                 raise BzrCommandError(e)
 

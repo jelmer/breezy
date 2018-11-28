@@ -501,7 +501,7 @@ class InterGitNonGitRepository(InterFromGitRepository):
         return list(potential - self._target_has_shas(potential))
 
     def _warn_slow(self):
-        if not self._show_slow_warning:
+        if self._show_slow_warning:
             trace.warning(
                 'Fetching from Git to Bazaar repository. '
                 'For better performance, fetch into a Git repository.')
