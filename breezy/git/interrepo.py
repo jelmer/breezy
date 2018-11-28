@@ -103,6 +103,7 @@ class InterToGitRepository(InterRepository):
         super(InterToGitRepository, self).__init__(source, target)
         self.mapping = self.target.get_mapping()
         self.source_store = get_object_store(self.source, self.mapping)
+        self._show_slow_warning = not config.GlobalConfig().suppress_warning('slow_intervcs_push')
 
     @staticmethod
     def _get_repo_format_to_test():
@@ -159,7 +160,7 @@ class InterToGitRepository(InterRepository):
             return self.source.revision_ids_to_search_result(missing_revids)
 
     def _warn_slow(self):
-        if not config.GlobalConfig().suppress_warning('slow_intervcs_push'):
+        if self._show_slow_warning:
             trace.warning(
                 'Pushing from a Bazaar to a Git repository. '
                 'For better performance, push into a Bazaar repository.')
@@ -474,6 +475,10 @@ class InterGitNonGitRepository(InterFromGitRepository):
     """Base InterRepository that copies revisions from a Git into a non-Git
     repository."""
 
+    def __init__(self, source, target):
+        super(InterGitNonGitRepository, self).__init__(source, target)
+        self._show_slow_warning = not config.GlobalConfig().suppress_warning('slow_intervcs_push')
+
     def _target_has_shas(self, shas):
         revids = {}
         for sha in shas:
@@ -496,7 +501,7 @@ class InterGitNonGitRepository(InterFromGitRepository):
         return list(potential - self._target_has_shas(potential))
 
     def _warn_slow(self):
-        if not config.GlobalConfig().suppress_warning('slow_intervcs_push'):
+        if not self._show_slow_warning:
             trace.warning(
                 'Fetching from Git to Bazaar repository. '
                 'For better performance, fetch into a Git repository.')

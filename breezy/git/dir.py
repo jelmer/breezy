@@ -764,6 +764,7 @@ class GitToBzrConverter(Converter):
         source_repo = source.find_repository()
 
         interrepo = InterRepository.get(source_repo, target_repo)
+        interrepo._show_slow_warning = False
         mapping = source_repo.get_mapping()
         refs = interrepo.fetch()
         for i, (name, sha) in enumerate(viewitems(refs)):
@@ -829,6 +830,7 @@ class BzrToGitConverter(Converter):
             interrepo = InterRepository.get(
                 to_convert.find_repository(),
                 target.find_repository())
+            interrepo._show_slow_warning = False
             def update_refs(old_refs):
                 refs = {}
                 for branch in to_convert.list_branches():
