@@ -77,7 +77,7 @@ class Convert(object):
     def convert(self):
         try:
             branch = self.controldir.open_branch()
-            if branch.user_url != self.controldir.user_url:
+            if branch.controldir.user_url != self.controldir.user_url:
                 ui.ui_factory.note(gettext(
                     'This is a checkout. The branch (%s) needs to be upgraded'
                     ' separately.') % (urlutils.unescape_for_display(
@@ -105,7 +105,7 @@ class Convert(object):
         ui.ui_factory.note(gettext('starting upgrade of %s') %
                            urlutils.unescape_for_display(self.transport.base, 'utf-8'))
 
-        self.backup_oldpath, self.backup_newpath = self.controldir.backup_bzrdir()
+        self.backup_oldpath, self.backup_newpath = self.controldir.backup_controldir()
         while self.controldir.needs_format_conversion(format):
             converter = self.controldir._format.get_converter(format)
             self.controldir = converter.convert(self.controldir, format, None)

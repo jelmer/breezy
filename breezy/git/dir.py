@@ -631,7 +631,7 @@ class LocalGitDir(GitDir):
             branch.set_append_revisions_only(append_revisions_only)
         return branch
 
-    def backup_bzrdir(self):
+    def backup_controldir(self):
         if not self._git.bare:
             self.root_transport.copy_tree(".git", ".git.backup")
             return (self.root_transport.abspath(".git"),
@@ -800,7 +800,8 @@ class GitToBzrConverter(Converter):
         target = target_format.initialize_on_transport(
             to_convert.root_transport)
         self.copy_contents(to_convert, target, pb)
-        target.create_checkout()
+        target.create_workingtree()
+        to_convert.control_transport.delete_tree('.')
         return target
 
 
@@ -843,6 +844,7 @@ class BzrToGitConverter(Converter):
                     if not versioned or kind == 'directory':
                         continue
                     target_wt._index_add_entry(path, kind)
+        to_convert.control_transport.delete_tree('.')
         return target
 
 

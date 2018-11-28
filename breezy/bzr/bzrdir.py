@@ -490,7 +490,7 @@ class BzrDir(controldir.ControlDir):
         """
         return osutils.available_backup_name(base, self.root_transport.has)
 
-    def backup_bzrdir(self):
+    def backup_controldir(self):
         """Backup this bzr control directory.
 
         :return: Tuple with old path name and new path name

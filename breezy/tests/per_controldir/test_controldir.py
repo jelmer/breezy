@@ -1593,7 +1593,7 @@ class TestControlDir(TestCaseWithControlDir):
         self.build_tree(['test/a'])
         tree.add(['a'])
         tree.commit('some data to be copied.')
-        old_url, new_url = tree.controldir.backup_bzrdir()
+        old_url, new_url = tree.controldir.backup_controldir()
         old_path = urlutils.local_path_from_url(old_url)
         new_path = urlutils.local_path_from_url(new_url)
         self.assertPathExists(old_path)
