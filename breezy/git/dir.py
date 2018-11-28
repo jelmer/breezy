@@ -799,8 +799,12 @@ class GitToBzrConverter(Converter):
     def convert(self, to_convert, target_format, pb):
         target = target_format.initialize_on_transport(
             to_convert.root_transport)
-        self.copy_contents(to_convert, target, pb)
-        target.create_workingtree()
+        try:
+            self.copy_contents(to_convert, target, pb)
+            target.create_workingtree()
+        except BaseException:
+            target.control_transport.delete_tree('.')
+            raise
         to_convert.control_transport.delete_tree('.')
         return target
 
@@ -821,29 +825,33 @@ class BzrToGitConverter(Converter):
         from .refs import branch_name_to_ref, tag_name_to_ref
         target = target_format.initialize_on_transport(
             to_convert.root_transport)
-        interrepo = InterRepository.get(
-            to_convert.find_repository(),
-            target.find_repository())
-        def update_refs(old_refs):
-            refs = {}
-            for branch in to_convert.list_branches():
-                refs[branch_name_to_ref(branch.name)] = (None, branch.last_revision())
-                for tag_name, revid in viewitems(branch.tags.get_tag_dict()):
-                    refs[tag_name_to_ref(tag_name)] = (None, revid)
-            return refs
-        interrepo.fetch_refs(update_refs, lossy=True)
-        # Stage the open files
         try:
-            wt = to_convert.open_workingtree()
-        except brz_errors.NoWorkingTree:
-            pass
-        else:
-            target_wt = target.open_workingtree()
-            with target_wt.lock_tree_write():
-                for path, versioned, kind, file_id, ie in wt.list_files():
-                    if not versioned or kind == 'directory':
-                        continue
-                    target_wt._index_add_entry(path, kind)
+            interrepo = InterRepository.get(
+                to_convert.find_repository(),
+                target.find_repository())
+            def update_refs(old_refs):
+                refs = {}
+                for branch in to_convert.list_branches():
+                    refs[branch_name_to_ref(branch.name)] = (None, branch.last_revision())
+                    for tag_name, revid in viewitems(branch.tags.get_tag_dict()):
+                        refs[tag_name_to_ref(tag_name)] = (None, revid)
+                return refs
+            interrepo.fetch_refs(update_refs, lossy=True)
+            # Stage the open files
+            try:
+                wt = to_convert.open_workingtree()
+            except brz_errors.NoWorkingTree:
+                pass
+            else:
+                target_wt = target.open_workingtree()
+                with target_wt.lock_tree_write():
+                    for path, versioned, kind, file_id, ie in wt.list_files():
+                        if not versioned or kind == 'directory':
+                            continue
+                        target_wt._index_add_entry(path, kind)
+        except BaseException:
+            target.control_transport.delete_tree('.')
+            raise
         to_convert.control_transport.delete_tree('.')
         return target
 
