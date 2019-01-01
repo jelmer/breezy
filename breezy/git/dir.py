@@ -847,7 +847,7 @@ class BzrToGitConverter(Converter):
             else:
                 target_wt = target.open_workingtree()
                 with target_wt.lock_tree_write():
-                    for path, versioned, kind, file_id, ie in wt.list_files():
+                    for path, versioned, kind, ie in wt.list_files():
                         if not versioned or kind == 'directory':
                             continue
                         target_wt._index_add_entry(path, kind)

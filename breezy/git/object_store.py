@@ -47,7 +47,7 @@ from ..revision import (
     NULL_REVISION,
     )
 from ..sixish import viewitems
-from ..testament import (
+from ..bzr.testament import (
     StrictTestament3,
     )
 
@@ -254,7 +254,7 @@ def _tree_to_objects(tree, parent_trees, idmap, unusual_modes,
         if name[1] in BANNED_FILENAMES:
             continue
         if kind[1] == "file":
-            sha1 = tree.get_file_sha1(path[1], file_id)
+            sha1 = tree.get_file_sha1(path[1])
             blob_id = None
             try:
                 (pfile_id, prevision) = find_unchanged_parent_ie(
@@ -271,7 +271,7 @@ def _tree_to_objects(tree, parent_trees, idmap, unusual_modes,
                     if not changed_content:
                         # no-change merge ?
                         blob = Blob()
-                        blob.data = tree.get_file_text(path[1], file_id)
+                        blob.data = tree.get_file_text(path[1])
                         blob_id = blob.id
             if blob_id is None:
                 new_blobs.append((path[1], file_id))
@@ -282,7 +282,7 @@ def _tree_to_objects(tree, parent_trees, idmap, unusual_modes,
                         ("blob", blob_id),
                         (file_id, tree.get_file_revision(path[1])), path[1])
         elif kind[1] == "symlink":
-            target = tree.get_symlink_target(path[1], file_id)
+            target = tree.get_symlink_target(path[1])
             blob = symlink_to_blob(target)
             shamap[path[1]] = blob.id
             if add_cache_entry is not None:
@@ -294,7 +294,7 @@ def _tree_to_objects(tree, parent_trees, idmap, unusual_modes,
             except KeyError:
                 if changed_content:
                     yield (path[1], blob,
-                           (file_id, tree.get_file_revision(path[1], file_id)))
+                           (file_id, tree.get_file_revision(path[1])))
         elif kind[1] is None:
             shamap[path[1]] = None
         elif kind[1] != 'directory':
@@ -593,9 +593,8 @@ class BazaarObjectStore(BaseObjectStore):
                 # Perhaps it's a symlink ?
                 tree = self.tree_cache.revision_tree(revision)
                 path = tree.id2path(file_id)
-                if tree.kind(path, file_id) == 'symlink':
-                    blob = symlink_to_blob(
-                        tree.get_symlink_target(path, file_id))
+                if tree.kind(path) == 'symlink':
+                    blob = symlink_to_blob(tree.get_symlink_target(path))
             _check_expected_sha(expected_sha, blob)
             yield blob
 
