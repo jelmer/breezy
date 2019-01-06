@@ -1935,7 +1935,7 @@ class DirStateRevisionTree(InventoryTree):
         for path, identifier in desired_files:
             entry = self._get_entry(path=path)
             if entry == (None, None):
-                raise errors.NoSuchFile(self, path)
+                raise errors.NoSuchFile(path)
             repo_desired_files.append((entry[0][2], entry[1][parent_index][4],
                                        identifier))
         return self._repository.iter_files_bytes(repo_desired_files)
@@ -2024,7 +2024,7 @@ class DirStateRevisionTree(InventoryTree):
         if inv.root is not None and not include_root and from_dir is None:
             next(entries)
         for path, entry in entries:
-            yield path, 'V', entry.kind, entry.file_id, entry
+            yield path, 'V', entry.kind, entry
 
     def lock_read(self):
         """Lock the tree for a set of operations.
