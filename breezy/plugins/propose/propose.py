@@ -226,7 +226,7 @@ class Hoster(object):
     def iter_instances(cls):
         """Iterate instances.
 
-        :return: Hoster instances
+        :return: Iterator over Hoster instances
         """
         raise NotImplementedError(cls.iter_instances)
 
