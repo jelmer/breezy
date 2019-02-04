@@ -223,8 +223,8 @@ class cmd_find_merge_proposal(Command):
         else:
             target = _mod_branch.Branch.open(submit_branch)
         hoster = _mod_propose.get_hoster(branch)
-        mp = hoster.get_proposal(branch, target)
-        self.outf.write(gettext('Merge proposal: %s\n') % mp.url)
+        for mp in hoster.iter_proposals(branch, target):
+            self.outf.write(gettext('Merge proposal: %s\n') % mp.url)
 
 
 class cmd_github_login(Command):
@@ -268,17 +268,21 @@ class cmd_gitlab_login(Command):
     __doc__ = """Log into a GitLab instance.
 
     This command takes a GitLab instance URL (e.g. https://gitlab.com)
-    as well as a private token. Private tokens can be created via the
+    as well as an optional private token. Private tokens can be created via the
     web UI.
 
     :Examples:
 
-      Log into Debian's salsa:
+      Log into GNOME's GitLab (prompts for a token):
+
+         brz gitlab-login https://gitlab.gnome.org/
+
+      Log into Debian's salsa, using a token created earlier:
 
          brz gitlab-login https://salsa.debian.org if4Theis6Eich7aef0zo
     """
 
-    takes_args = ['url', 'private_token']
+    takes_args = ['url', 'private_token?']
 
     takes_options = [
         Option('name', help='Name for GitLab site in configuration.',
@@ -287,7 +291,8 @@ class cmd_gitlab_login(Command):
                "Don't check that the token is valid."),
         ]
 
-    def run(self, url, private_token, name=None, no_check=False):
+    def run(self, url, private_token=None, name=None, no_check=False):
+        from breezy import ui
         from .gitlabs import store_gitlab_token
         if name is None:
             try:
@@ -295,8 +300,39 @@ class cmd_gitlab_login(Command):
             except (ValueError, IndexError):
                 raise errors.BzrCommandError(
                     'please specify a site name with --name')
+        if private_token is None:
+            note("Please visit %s to obtain a private token.",
+                 urlutils.join(url, "profile/personal_access_tokens"))
+            private_token = ui.ui_factory.get_password(u'Private token')
         if not no_check:
             from gitlab import Gitlab
             gl = Gitlab(url=url, private_token=private_token)
             gl.auth()
         store_gitlab_token(name=name, url=url, private_token=private_token)
+
+
+class cmd_my_merge_proposals(Command):
+    __doc__ = """List all merge proposals owned by the logged-in user.
+
+    """
+
+    hidden = True
+
+    takes_options = [
+        RegistryOption.from_kwargs(
+            'status',
+            title='Proposal Status',
+            help='Only include proposals with specified status.',
+            value_switches=True,
+            enum_switch=True,
+            all='All merge proposals',
+            open='Open merge proposals',
+            merged='Merged merge proposals',
+            closed='Closed merge proposals')]
+
+    def run(self, status='open'):
+        from .propose import hosters
+        for name, hoster_cls in hosters.items():
+            for instance in hoster_cls.iter_instances():
+                for mp in instance.iter_my_proposals(status=status):
+                    self.outf.write('%s\n' % mp.url)
