@@ -1,3 +1,10 @@
+//! Inventory delta serialisation.
+//!
+//! See doc/developers/inventory.txt for the description of the format.
+//!
+//! In this module the interesting classes are:
+//!  - InventoryDeltaSerializer - object to read/write inventory deltas.
+
 use bazaar::inventory::{describe_change, detect_changes, Entry, Error, Inventory as _};
 use bazaar::inventory_delta::{
     InventoryDeltaEntry, InventoryDeltaInconsistency, InventoryDeltaParseError,
@@ -1399,10 +1406,7 @@ impl Inventory {
     ) -> PyResult<Bound<IterEntriesIterator>> {
         let recursive = recursive.unwrap_or(true);
 
-        Bound::new(
-            py,
-            IterEntriesIterator::new(py, slf, from_dir, recursive)?,
-        )
+        Bound::new(py, IterEntriesIterator::new(py, slf, from_dir, recursive)?)
     }
 
     #[pyo3(signature = (from_dir=None, specific_file_ids=None))]
@@ -1818,6 +1822,147 @@ fn chk_inventory_bytes_to_utf8name_key<'py>(
         bazaar::chk_inventory::chk_inventory_bytes_to_utf8_name_key(data);
 
     Ok((PyBytes::new(py, name), file_id, revision_id))
+}
+
+#[pyclass]
+/// Deserialize inventory deltas.
+struct InventoryDeltaDeserializer {
+    allow_versioned_root: Option<bool>,
+    allow_tree_references: Option<bool>,
+}
+
+#[pymethods]
+impl InventoryDeltaDeserializer {
+    #[new]
+    #[pyo3(signature = (allow_versioned_root=None, allow_tree_references=None))]
+    /// Create an InventoryDeltaDeserializer.
+    ///
+    /// Arguments:
+    /// * `versioned_root`: If True, any root entry that is seen is expected to be versioned, and
+    /// root entries can have any fileid.
+    /// * `tree_references`: If True support tree-reference entries.
+    fn new(
+        allow_versioned_root: Option<bool>,
+        allow_tree_references: Option<bool>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            allow_versioned_root,
+            allow_tree_references,
+        })
+    }
+
+    /// Parse the text bytes of a serialized inventory delta.
+    ///
+    /// If versioned_root and/or tree_references flags were set via
+    /// require_flags, then the parsed flags must match or a BzrError will be
+    /// raised.
+    ///
+    /// Arguments:
+    /// * `lines`: The lines to parse. This can be obtained by calling
+    ///   delta_to_lines.
+    ///
+    /// Returns:
+    /// (parent_id, new_id, versioned_root, tree_references, inventory_delta)
+    fn parse_text_bytes<'a>(
+        &self,
+        py: Python<'a>,
+        lines: Vec<Vec<u8>>,
+    ) -> PyResult<(
+        Bound<'a, PyBytes>,
+        Bound<'a, PyBytes>,
+        bool,
+        bool,
+        Bound<'a, InventoryDelta>,
+    )> {
+        let lines = lines.iter().map(|x| x.as_slice()).collect::<Vec<_>>();
+
+        let (parent, version, versioned_root, tree_references, result) =
+            bazaar::inventory_delta::parse_inventory_delta(
+                lines.as_slice(),
+                self.allow_versioned_root,
+                self.allow_tree_references,
+            )
+            .map_err(|e| match e {
+                InventoryDeltaParseError::Invalid(m) => InventoryDeltaError::new_err((m,)),
+                InventoryDeltaParseError::Incompatible(m) => {
+                    IncompatibleInventoryDelta::new_err((m,))
+                }
+            })?;
+
+        let result = Bound::new(py, InventoryDelta(result))?;
+
+        Ok((
+            parent.into_pyobject(py)?,
+            version.into_pyobject(py)?,
+            versioned_root,
+            tree_references,
+            result,
+        ))
+    }
+}
+
+#[pyclass]
+/// Serialize inventory deltas.
+pub struct InventoryDeltaSerializer {
+    versioned_root: Option<bool>,
+    tree_references: Option<bool>,
+}
+
+#[pymethods]
+impl InventoryDeltaSerializer {
+    #[new]
+    #[pyo3(signature = (versioned_root=None, tree_references=None))]
+    /// Create an InventoryDeltaSerializer.
+    ///
+    /// Arguments:
+    /// * `versioned_root`: If True, any root entry that is seen is expected to be versioned, and
+    /// root entries can have any fileid.
+    /// * `tree_references`: If True support tree-reference entries.
+    fn new(versioned_root: Option<bool>, tree_references: Option<bool>) -> PyResult<Self> {
+        Ok(Self {
+            versioned_root,
+            tree_references,
+        })
+    }
+
+    /// Return a line sequence for delta_to_new.
+    ///
+    /// Both the versioned_root and tree_references flags must be set via
+    /// require_flags before calling this.
+    ///
+    /// Arguments:
+    /// * `old_name`: A UTF8 revision id for the old inventory.  May be
+    ///    NULL_REVISION if there is no older inventory and delta_to_new
+    ///    includes the entire inventory contents.
+    /// * `new_name`: The version name of the inventory we create with this delta.
+    /// * `delta_to_new`: An inventory delta such as Inventory.apply_delta takes.
+    ///
+    /// Returns: The serialized delta as lines
+    #[pyo3(signature = (old_name, new_name, delta_to_new))]
+    fn delta_to_lines<'a>(
+        &self,
+        py: Python<'a>,
+        old_name: RevisionId,
+        new_name: RevisionId,
+        delta_to_new: &InventoryDelta,
+    ) -> PyResult<Vec<Bound<'a, PyBytes>>> {
+        let lines = bazaar::inventory_delta::serialize_inventory_delta(
+            &old_name,
+            &new_name,
+            &delta_to_new.0,
+            self.versioned_root.unwrap_or(true),
+            self.tree_references.unwrap_or(true),
+        )
+        .map_err(|e| match e {
+            InventoryDeltaSerializeError::Invalid(m) => InventoryDeltaError::new_err((m,)),
+            InventoryDeltaSerializeError::UnsupportedKind(m) => PyKeyError::new_err((m,)),
+        })?;
+
+        Ok(lines
+            .into_iter()
+            .map(|x| PyBytes::new(py, x.as_slice()))
+            .collect())
+    }
 }
 
 pub fn _inventory_rs(py: Python) -> PyResult<Bound<PyModule>> {
