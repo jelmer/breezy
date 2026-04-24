@@ -925,7 +925,7 @@ class Merge3Merger:
                 # Try merging each entry
                 child_pb.update(gettext("Preparing file merge"), num, len(entries))
                 self._merge_names(
-                    trans_id, file_id, paths3, parents3, names3, resolver=resolver
+                    trans_id, paths3, parents3, names3, resolver=resolver
                 )
                 if changed:
                     file_status = self._do_merge_contents(paths3, trans_id)
@@ -1346,14 +1346,15 @@ class Merge3Merger:
                 return self.tt.trans_id_file_id(parent_id)
         return self.tt.trans_id_tree_path(parent_path)
 
-    def _merge_names(self, trans_id, file_id, paths, parents, names, resolver):
+    def _merge_names(self, trans_id, paths, parents, names, resolver):
         """Perform a merge on file names and parent directory paths.
 
-        ``parents`` here are parent *paths* (``posixpath.dirname`` of each
-        tree's path), not file ids; they feed the 3-way resolver as scalars
-        whose equality reflects reparenting/renaming. ``file_id`` is
-        threaded through for the ``_raw_conflicts`` record only; it may be
-        ``None`` for trees without file ids.
+        ``parents`` are parent *paths* (``posixpath.dirname`` of each
+        tree's path); they feed the 3-way resolver as scalars whose
+        equality reflects reparenting/renaming. The conflict cooker
+        recovers the file id (when the tree format has one) from the
+        trans_id via ``final_file_id``, so this method no longer
+        threads a file id through its records.
         """
         _base_name, other_name, this_name = names
         _base_parent_path, other_parent_path, this_parent_path = parents
@@ -1376,7 +1377,6 @@ class Merge3Merger:
                 (
                     "path conflict",
                     trans_id,
-                    file_id,
                     self._parent_trans_id(self.this_tree, this_parent_path),
                     this_name,
                     self._parent_trans_id(self.other_tree, other_parent_path),

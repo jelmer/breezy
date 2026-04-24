@@ -1087,15 +1087,14 @@ def cook_path_conflict(
     fp,
     conflict_type,
     trans_id,
-    file_id,
     this_parent,
     this_name,
     other_parent,
     other_name,
 ):
     # this_parent / other_parent are trans_ids (ROOT_PARENT for the tree
-    # root, None when the file is absent in that tree); no file id lookup
-    # is performed here.
+    # root, None when the file is absent in that tree); the file_id
+    # (if any) is recovered from the trans_id at cook time.
     if this_parent is None or this_name is None:
         this_path = "<deleted>"
     else:
@@ -1111,7 +1110,10 @@ def cook_path_conflict(
             parent_path = ""
         other_path = osutils.pathjoin(parent_path, other_name)
     return Conflict.factory(
-        conflict_type, path=this_path, conflict_path=other_path, file_id=file_id
+        conflict_type,
+        path=this_path,
+        conflict_path=other_path,
+        file_id=tt.final_file_id(trans_id),
     )
 
 
