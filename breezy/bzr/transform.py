@@ -1090,16 +1090,18 @@ def cook_path_conflict(
     other_parent,
     other_name,
 ):
+    # this_parent / other_parent are trans_ids (ROOT_PARENT for the tree
+    # root, None when the file is absent in that tree); no file id lookup
+    # is performed here.
     if this_parent is None or this_name is None:
         this_path = "<deleted>"
     else:
-        parent_path = fp.get_path(tt.trans_id_file_id(this_parent))
-        this_path = osutils.pathjoin(parent_path, this_name)
+        this_path = osutils.pathjoin(fp.get_path(this_parent), this_name)
     if other_parent is None or other_name is None:
         other_path = "<deleted>"
     else:
         try:
-            parent_path = fp.get_path(tt.trans_id_file_id(other_parent))
+            parent_path = fp.get_path(other_parent)
         except NoFinalPath:
             # The other entry was in a path that doesn't exist in our tree.
             # Put it in the root.

@@ -307,7 +307,11 @@ class TestMergedBranch(per_workingtree.TestCaseWithWorkingTree):
         # And now file4 gets renamed into an existing dir
         nb_conflicts = outer.merge_from_branch(inner, to_revision=revs[4])
         if outer.supports_rename_tracking():
-            self.assertEqual(1, len(nb_conflicts))
+            # The merge resolves the rename cleanly via file-id lookup
+            # (inner's `dir` and outer's `dir-outer/dir` share a file id),
+            # so file4 lands under `dir-outer/dir/file4` without a
+            # "Moved to root" conflict.
+            self.assertEqual(0, len(nb_conflicts))
             self.assertTreeLayout(
                 [
                     "dir-outer",
