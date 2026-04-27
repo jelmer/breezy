@@ -20,6 +20,13 @@ import os
 import posixpath
 import sys
 
+from dromedary.errors import (
+    FileExists,
+    NoSuchFile,
+    NotLocalUrl,
+    ReadError,
+    TransportNotPossible,
+)
 from dulwich.errors import NoIndexPresent
 from dulwich.file import FileLocked, _GitFile
 from dulwich.object_store import (
@@ -56,19 +63,16 @@ from dulwich.repo import (
     write_packed_refs,
 )
 
+from breezy.errors import LockContention
+
 from .. import osutils, urlutils
 from .. import transport as _mod_transport
 from ..errors import (
     AlreadyControlDirError,
     LockBroken,
-    LockContention,
-    NotLocalUrl,
-    ReadError,
-    TransportNotPossible,
 )
 from ..lock import LogicalLockResult
 from ..trace import warning
-from ..transport import FileExists, NoSuchFile
 
 
 class _RemoteGitFile:
@@ -201,15 +205,19 @@ class TransportRefsContainer(RefsContainer):
             except NoSuchFile:
                 return {}
             try:
-                first_line = next(iter(f)).rstrip()
+                from io import BytesIO
+
+                content = f.read()
+                buf = BytesIO(content)
+                first_line = buf.readline().rstrip()
                 if first_line.startswith(b"# pack-refs") and b" peeled" in first_line:
-                    for sha, name, peeled in read_packed_refs_with_peeled(f):
+                    for sha, name, peeled in read_packed_refs_with_peeled(buf):
                         self._packed_refs[name] = sha
                         if peeled:
                             self._peeled_refs[name] = peeled
                 else:
-                    f.seek(0)
-                    for sha, name in read_packed_refs(f):
+                    buf.seek(0)
+                    for sha, name in read_packed_refs(buf):
                         self._packed_refs[name] = sha
             finally:
                 f.close()
@@ -260,7 +268,9 @@ class TransportRefsContainer(RefsContainer):
                 return None
             if header == SYMREF:
                 # Read only the first line
-                return header + next(iter(f)).rstrip(b"\r\n")
+                rest = f.read()
+                first_line = rest.split(b"\n", 1)[0].rstrip(b"\r")
+                return header + first_line
             else:
                 # Read only the first 40 bytes
                 return header + f.read(40 - len(SYMREF))

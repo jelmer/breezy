@@ -1277,7 +1277,7 @@ class SmartServerRepositoryGetInventories(SmartServerRepositoryRequest):
                     prev_inv.revision_id, inv.revision_id, inv_delta
                 )
                 yield ChunkedContentFactory(
-                    inv.revision_id, None, None, lines, chunks_are_lines=True
+                    (inv.revision_id,), None, None, lines
                 )
                 prev_inv = inv
 

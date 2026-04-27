@@ -156,7 +156,7 @@ class _Serializer_v4(XMLSerializer):
         rev = Revision(
             committer=elt.get("committer"),
             timestamp=float(elt.get("timestamp")),
-            revision_id=elt.get("revision_id"),
+            revision_id=elt.get("revision_id").encode("utf-8"),
             inventory_id=elt.get("inventory_id"),
             inventory_sha1=elt.get("inventory_sha1"),
         )
@@ -168,7 +168,7 @@ class _Serializer_v4(XMLSerializer):
 
         if pelts is not None:
             for p in pelts:
-                rev.parent_ids.append(p.get("revision_id"))
+                rev.parent_ids.append(p.get("revision_id").encode("utf-8"))
                 rev.parent_sha1s.append(p.get("revision_sha1"))
             if precursor:
                 # must be consistent
@@ -176,7 +176,11 @@ class _Serializer_v4(XMLSerializer):
         elif precursor:
             # revisions written prior to 0.0.5 have a single precursor
             # give as an attribute
-            rev.parent_ids.append(precursor)
+            rev.parent_ids.append(
+                precursor.encode("utf-8")
+                if isinstance(precursor, str)
+                else precursor
+            )
             rev.parent_sha1s.append(precursor_sha1)
 
         v = elt.get("timezone")

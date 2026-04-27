@@ -21,8 +21,9 @@ and sometimes don't.  By using this decorator, you can force those transports
 to never have a smart medium.
 """
 
-from .. import errors
-from ..transport import decorator
+from dromedary import decorator
+
+from breezy.bzr.smart import transport as _smart_transport
 
 
 class NoSmartTransportDecorator(decorator.TransportDecorator):
@@ -33,11 +34,19 @@ class NoSmartTransportDecorator(decorator.TransportDecorator):
         return "nosmart+"
 
     def get_smart_medium(self):
-        raise errors.NoSmartMedium(self)
+        """Raise NoSmartMedium exception to disable smart medium functionality.
+
+        This method intentionally raises an exception to prevent the use of
+        smart mediums, forcing the transport to use standard protocols.
+
+        Raises:
+            NoSmartMedium: Always raised to indicate no smart medium is available.
+        """
+        raise _smart_transport.NoSmartMedium(self)
 
 
 def get_test_permutations():
     """Return the permutations to be used in testing."""
-    from ..tests import test_server
+    from breezy.tests import test_server
 
     return [(NoSmartTransportDecorator, test_server.NoSmartTransportServer)]

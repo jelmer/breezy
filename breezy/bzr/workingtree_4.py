@@ -54,13 +54,15 @@ from breezy.bzr import (
 
 from .. import errors
 from .. import revision as _mod_revision
+from dromedary import errors as transport_errors
+from dromedary.local import LocalTransport
+
 from ..lock import LogicalLockResult
-from ..lockable_files import LockableFiles
 from ..lockdir import LockDir
 from ..mutabletree import BadReferenceTarget, MutableTree
 from ..osutils import file_kind, isdir, pathjoin, realpath, safe_unicode
 from ..transport import NoSuchFile, get_transport_from_path
-from ..transport.local import LocalTransport
+from .lockable_files import LockableFiles
 from ..tree import FileTimestampUnavailable, InterTree, MissingNestedTree
 from ..workingtree import WorkingTree
 from . import dirstate
@@ -187,7 +189,7 @@ class DirStateWorkingTree(InventoryWorkingTree):
                     # try for a write lock - need permission to get one anyhow
                     # to break locks.
                     state.lock_write()
-                except errors.LockContention:
+                except (errors.LockContention, transport_errors.LockContention):
                     # oslocks fail when a process is still live: fail.
                     # TODO: get the locked lockdir info and give to the user to
                     # assist in debugging.

@@ -31,6 +31,7 @@ from breezy import (
     )
 """,
 )
+
 from . import controldir, errors, osutils, trace
 from . import revision as _mod_revision
 from .revisionspec import RevisionSpec, RevisionSpec_revid, RevisionSpec_revno

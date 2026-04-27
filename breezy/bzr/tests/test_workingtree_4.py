@@ -20,6 +20,8 @@
 import os
 import time
 
+from dromedary import errors as transport_errors
+
 from ... import errors, osutils
 from ...lockdir import LockDir
 from ...tests import TestCaseWithTransport, TestSkipped, features
@@ -91,7 +93,7 @@ class TestWorkingTreeFormat4(TestCaseWithTransport):
         dir.create_branch()
         try:
             return workingtree_4.WorkingTreeFormat4().initialize(dir)
-        except errors.NotLocalUrl as e:
+        except transport_errors.NotLocalUrl as e:
             raise TestSkipped("Not a local URL") from e
 
     def test_dirstate_stores_all_parent_inventories(self):

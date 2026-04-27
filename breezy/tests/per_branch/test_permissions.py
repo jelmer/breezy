@@ -121,13 +121,17 @@ class TestPermissions(tests.TestCaseWithTransport):
             raise tests.TestNotApplicable("Remote branches have no permission logic")
         self.make_branch_and_tree(".")
         bzrdir = ControlDir.open(".")
-        # Monkey patch the transport
-        _orig_stat = bzrdir.transport.stat
+        # Wrap the transport so that stat returns null permissions.
+        _orig_transport = bzrdir.transport
+        _orig_stat = _orig_transport.stat
 
-        def null_perms_stat(*args, **kwargs):
-            result = _orig_stat(*args, **kwargs)
-            return _NullPermsStat(result)
+        class _NullPermsTransport:
+            def __getattr__(self, name):
+                return getattr(_orig_transport, name)
 
-        bzrdir.transport.stat = null_perms_stat
+            def stat(self, *args, **kwargs):
+                return _NullPermsStat(_orig_stat(*args, **kwargs))
+
+        bzrdir.transport = _NullPermsTransport()
         self.assertIs(None, bzrdir._get_dir_mode())
         self.assertIs(None, bzrdir._get_file_mode())

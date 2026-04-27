@@ -21,11 +21,16 @@
 # TODO: might be nice to create a versionedfile with some type of corruption
 # considered typical and check that it can be detected/corrected.
 
+import contextlib
 import itertools
 from gzip import GzipFile
 from io import BytesIO
 
-import vcsgraph
+from dromedary.errors import NoSuchFile
+from dromedary.memory import MemoryTransport
+from vcsgraph import (
+    known_graph as _mod_known_graph,
+)
 
 from ... import errors, osutils, progress, transport, ui
 from ...errors import RevisionAlreadyPresent, RevisionNotPresent
@@ -37,7 +42,6 @@ from ...tests import (
 )
 from ...tests.http_utils import TestCaseWithWebserver
 from ...tests.scenarios import load_tests_apply_scenarios
-from ...transport.memory import MemoryTransport
 from .. import groupcompress
 from .. import knit as _mod_knit
 from .. import versionedfile as versionedfile
@@ -71,10 +75,7 @@ def get_diamond_vf(f, trailing_eol=True, left_only=False):
         b"merged": ((b"left",), (b"right",)),
     }
     # insert a diamond graph to exercise deltas and merges.
-    if trailing_eol:
-        last_char = b"\n"
-    else:
-        last_char = b""
+    last_char = b"\n" if trailing_eol else b""
     f.add_lines(b"origin", [], [b"origin" + last_char])
     f.add_lines(b"base", [b"origin"], [b"base" + last_char])
     f.add_lines(b"left", [b"base"], [b"base\n", b"left" + last_char])
@@ -109,15 +110,9 @@ def get_diamond_files(
     """
     if nokeys:
         nograph = True
-    if key_length == 1:
-        prefixes = [()]
-    else:
-        prefixes = [(b"FileA",), (b"FileB",)]
+    prefixes = [()] if key_length == 1 else [(b"FileA",), (b"FileB",)]
     # insert a diamond graph to exercise deltas and merges.
-    if trailing_eol:
-        last_char = b"\n"
-    else:
-        last_char = b""
+    last_char = b"\n" if trailing_eol else b""
     result = []
 
     def get_parents(suffix_list):
@@ -307,10 +302,8 @@ class VersionedFileTestMixIn:
         )
         # but inline CR's are allowed
         vf.add_lines(b"a", [], [b"a\r\n"])
-        try:
+        with contextlib.suppress(NotImplementedError):
             vf.add_lines_with_ghosts(b"b", [], [b"a\r\n"])
-        except NotImplementedError:
-            pass
 
     def test_add_reserved(self):
         vf = self.get_file()
@@ -414,7 +407,7 @@ class VersionedFileTestMixIn:
         # happens).
         for length in range(20):
             version_lines = {}
-            vf = self.get_file(f"case-%{length}")
+            vf = self.get_file("case-%d" % length)
             prefix = b"step-%d"
             parents = []
             for step in range(length):
@@ -437,10 +430,7 @@ class VersionedFileTestMixIn:
         parents = []
         for i in range(4):
             version = b"v%d" % i
-            if i % 2:
-                lines = sample_text_nl
-            else:
-                lines = sample_text_no_nl
+            lines = sample_text_nl if i % 2 else sample_text_no_nl
             # left_matching blocks is an internal api; it operates on the
             # *internal* representation for a knit, which is with *all* lines
             # being normalised to end with \n - even the final line in a no_nl
@@ -631,7 +621,7 @@ class VersionedFileTestMixIn:
         f.add_lines(b"r3", [], [b"a\n", b"b\n"])
         f.add_lines(b"m", [b"r0", b"r1", b"r2", b"r3"], [b"a\n", b"b\n"])
         self.assertEqual({b"m": (b"r0", b"r1", b"r2", b"r3")}, f.get_parent_map([b"m"]))
-        self.assertEqual({}, f.get_parent_map(b"y"))
+        self.assertEqual({}, f.get_parent_map([b"y"]))
         self.assertEqual(
             {b"r0": (), b"r1": (b"r0",)}, f.get_parent_map([b"r0", b"y", b"r1"])
         )
@@ -897,7 +887,7 @@ class TestWeave(TestCaseWithMemoryTransport, VersionedFileTestMixIn):
 
     def test_no_implicit_create(self):
         self.assertRaises(
-            transport.NoSuchFile,
+            NoSuchFile,
             WeaveFile,
             "foo",
             self.get_transport(),
@@ -979,7 +969,7 @@ class TestPlanMergeVersionedFile(TestCaseWithMemoryTransport):
         self.assertEqual(b"a", b"".join(get_record(b"A").iter_bytes_as("chunked")))
         self.assertEqual(b"c", get_record(b"C").get_bytes_as("fulltext"))
         self.assertEqual(b"e", get_record(b"E:").get_bytes_as("fulltext"))
-        self.assertEqual("absent", get_record("F").storage_kind)
+        self.assertEqual("absent", get_record(b"F").storage_kind)
 
 
 class TestReadonlyHttpMixin:
@@ -1036,7 +1026,7 @@ class MergeCasesMixin:
         p = list(w.plan_merge(b"text1", b"text2"))
         for state, line in p:
             if line:
-                self.log(f"{state:12} | {line[:-1]}")
+                self.log("%12s | %s" % (state, line[:-1]))
 
         self.log("merge:")
         mt = BytesIO()
@@ -1066,14 +1056,14 @@ class MergeCasesMixin:
             [b"aaa", b"xxx", b"bbb", b"yyy", b"ccc"],
         )
 
-    overlappedInsertExpected = [b"aaa", b"xxx", b"yyy", b"bbb"]
+    overlapped_insert_expected = [b"aaa", b"xxx", b"yyy", b"bbb"]
 
     def testOverlappedInsert(self):
         self.doMerge(
             [b"aaa", b"bbb"],
             [b"aaa", b"xxx", b"yyy", b"bbb"],
             [b"aaa", b"xxx", b"bbb"],
-            self.overlappedInsertExpected,
+            self.overlapped_insert_expected,
         )
 
         # really it ought to reduce this to
@@ -1124,7 +1114,7 @@ class MergeCasesMixin:
         p = list(w.plan_merge(b"text1", b"text2"))
         for state, line in p:
             if line:
-                self.log(f"{state:12} | {line[:-1]}")
+                self.log("%12s | %s" % (state, line[:-1]))
         self.log("merge result:")
         result_text = b"".join(w.weave_merge(p))
         self.log(result_text)
@@ -1269,7 +1259,7 @@ class TestWeaveMerge(TestCaseWithMemoryTransport, MergeCasesMixin):
         write_weave(w, tmpf)
         self.log(tmpf.getvalue())
 
-    overlappedInsertExpected = [
+    overlapped_insert_expected = [
         b"aaa",
         b"<<<<<<< ",
         b"xxx",
@@ -1640,9 +1630,7 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
     def test_add_fallback_implies_without_fallbacks(self):
         f = self.get_versionedfiles("files")
         if getattr(f, "add_fallback_versioned_files", None) is None:
-            raise TestNotApplicable(
-                "{} doesn't support fallbacks".format(f.__class__.__name__)
-            )
+            raise TestNotApplicable(f"{f.__class__.__name__} doesn't support fallbacks")
         g = self.get_versionedfiles("fallback")
         key_a = self.get_simple_key(b"a")
         g.add_lines(key_a, [], [b"\n"])
@@ -1700,10 +1688,7 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
     def test_annotate(self):
         files = self.get_versionedfiles()
         self.get_diamond_files(files)
-        if self.key_length == 1:
-            prefix = ()
-        else:
-            prefix = (b"FileA",)
+        prefix = () if self.key_length == 1 else (b"FileA",)
         # introduced full text
         origins = files.annotate(prefix + (b"origin",))
         self.assertEqual([(prefix + (b"origin",), b"origin\n")], origins)
@@ -1733,7 +1718,9 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
                 ],
                 origins,
             )
-        self.assertRaises(RevisionNotPresent, files.annotate, prefix + ("missing-key",))
+        self.assertRaises(
+            RevisionNotPresent, files.annotate, prefix + (b"missing-key",)
+        )
 
     def test_check_no_parameters(self):
         self.get_versionedfiles()
@@ -1965,7 +1952,7 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
         f.add_lines(key_b, [key_a], [b"\n"])
         f.add_lines(key_c, [key_a, key_b], [b"\n"])
         kg = f.get_known_graph_ancestry([key_c])
-        self.assertIsInstance(kg, vcsgraph.KnownGraph)
+        self.assertIsInstance(kg, _mod_known_graph.KnownGraph)
         self.assertEqual([key_a, key_b, key_c], list(kg.topo_sort()))
 
     def test_known_graph_with_fallbacks(self):
@@ -1973,9 +1960,7 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
         if not self.graph:
             raise TestNotApplicable("ancestry info only relevant with graph.")
         if getattr(f, "add_fallback_versioned_files", None) is None:
-            raise TestNotApplicable(
-                "{} doesn't support fallbacks".format(f.__class__.__name__)
-            )
+            raise TestNotApplicable(f"{f.__class__.__name__} doesn't support fallbacks")
         key_a = self.get_simple_key(b"a")
         key_b = self.get_simple_key(b"b")
         key_c = self.get_simple_key(b"c")
@@ -2149,10 +2134,7 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
 
     def assertStreamOrder(self, sort_order, seen, keys):
         self.assertEqual(len(set(seen)), len(keys))
-        if self.key_length == 1:
-            lows = {(): 0}
-        else:
-            lows = {(b"FileA",): 0, (b"FileB",): 0}
+        lows = {(): 0} if self.key_length == 1 else {(b"FileA",): 0, (b"FileB",): 0}
         if not self.graph:
             self.assertEqual(set(keys), set(seen))
         else:
@@ -2160,7 +2142,7 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
                 sort_pos = sort_order[key]
                 self.assertTrue(
                     sort_pos >= lows[key[:-1]],
-                    "Out of order in sorted stream: {!r}, {!r}".format(key, seen),
+                    f"Out of order in sorted stream: {key!r}, {seen!r}",
                 )
                 lows[key[:-1]] = sort_pos
 
@@ -2294,10 +2276,7 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
         key = self.get_simple_key(b"ft")
         key_delta = self.get_simple_key(b"delta")
         files.add_lines(key, (), [b"my text\n", b"content"])
-        if self.graph:
-            delta_parents = (key,)
-        else:
-            delta_parents = ()
+        delta_parents = (key,) if self.graph else ()
         files.add_lines(key_delta, delta_parents, [b"different\n", b"content\n"])
         local = files.get_record_stream([key, key_delta], "unordered", False)
         ref = files.get_record_stream([key, key_delta], "unordered", False)
@@ -2330,10 +2309,7 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
         key = self.get_simple_key(b"ft")
         key_delta = self.get_simple_key(b"delta")
         files.add_lines(key, (), [b"my text\n", b"content"])
-        if self.graph:
-            delta_parents = (key,)
-        else:
-            delta_parents = ()
+        delta_parents = (key,) if self.graph else ()
         files.add_lines(key_delta, delta_parents, [b"different\n", b"content\n"])
         # Copy the basis text across so we can reconstruct the delta during
         # insertion into target.
@@ -2369,10 +2345,7 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
         key = self.get_simple_key(b"ft")
         key_delta = self.get_simple_key(b"delta")
         files.add_lines(key, (), [b"my text\n", b"content"])
-        if self.graph:
-            delta_parents = (key,)
-        else:
-            delta_parents = ()
+        delta_parents = (key,) if self.graph else ()
         files.add_lines(key_delta, delta_parents, [b"different\n", b"content\n"])
         local = files.get_record_stream([key_delta], "unordered", True)
         ref = files.get_record_stream([key_delta], "unordered", True)
@@ -3025,13 +2998,7 @@ class TestVersionedFiles(TestCaseWithMemoryTransport):
         # bzr.
         files = self.get_versionedfiles()
         self.assertEqual(set(), set(files.keys()))
-        if self.key_length == 1:
-            key = (b"foo",)
-        else:
-            key = (
-                b"foo",
-                b"bar",
-            )
+        key = (b"foo",) if self.key_length == 1 else (b"foo", b"bar")
         files.add_lines(key, (), [])
         self.assertEqual({key}, set(files.keys()))
 

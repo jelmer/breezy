@@ -24,12 +24,13 @@ import sys
 from io import BytesIO
 from stat import S_ISDIR
 
+from dromedary.errors import NoSuchFile
+
 from ...bzr.bzrdir import BzrDirMetaFormat1
 from ...bzr.serializer import format_registry as serializer_format_registry
 from ...errors import IllegalPath
 from ...repository import InterRepository, Repository
 from ...tests import TestCase, TestCaseWithTransport
-from ...transport import NoSuchFile
 from . import xml4
 from .bzrdir import BzrDirFormat6
 from .repository import (
@@ -304,4 +305,4 @@ class TestSerializer(TestCase):
         eq(rev.committer, "Martin Pool <mbp@sourcefrog.net>")
         eq(rev.inventory_id, "mbp@sourcefrog.net-20050905080035-e0439293f8b6b9f9")
         eq(len(rev.parent_ids), 1)
-        eq(rev.parent_ids[0], "mbp@sourcefrog.net-20050905063503-43948f59fa127d92")
+        eq(rev.parent_ids[0], b"mbp@sourcefrog.net-20050905063503-43948f59fa127d92")

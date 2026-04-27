@@ -41,9 +41,9 @@ from breezy.bzr import (
     )
 """,
 )
-from ... import debug, errors, lockable_files, lockdir, osutils, trace, urlutils
+from ... import debug, errors, lockdir, osutils, trace, urlutils
 from ... import transport as _mod_transport
-from ...bzr import tuned_gzip, versionedfile, weave, weavefile
+from ...bzr import lockable_files, tuned_gzip, versionedfile, weave, weavefile
 from ...bzr.repository import RepositoryFormatMetaDir
 from ...bzr.versionedfile import (
     AbsentContentFactory,

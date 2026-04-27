@@ -465,6 +465,11 @@ class TestScopeReplacer(TestCase):
             self.fail("test_obj7 was not supposed to exist yet")
 
         InstrumentedReplacer(scope=globals(), name="test_obj7", factory=factory)
+        # The replacer is left in module globals as a permanently-broken
+        # placeholder (any access raises IllegalUseOfScopeReplacer). Make sure
+        # it's removed before the next test runs so module reloads don't trip
+        # over it.
+        self.addCleanup(globals().pop, "test_obj7", None)
 
         self.assertEqual(
             InstrumentedReplacer, object.__getattribute__(test_obj7, "__class__")

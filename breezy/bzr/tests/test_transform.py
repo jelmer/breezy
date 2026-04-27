@@ -18,6 +18,8 @@ import codecs
 import os
 import time
 
+from dromedary.local import file_kind
+
 from ... import errors, filters, osutils, rules
 from ...controldir import ControlDir
 from ...tests import UnavailableFeature, features

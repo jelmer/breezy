@@ -21,6 +21,7 @@
 import doctest
 import os
 
+from dromedary.local import file_kind
 from testtools import matchers
 
 from breezy import (

@@ -16,6 +16,9 @@
 
 """bzr-upload command implementations."""
 
+from dromedary import errors as transport_errors
+from dromedary.errors import NoSuchFile
+
 from ... import commands, config, errors, lazy_import, option, osutils
 
 lazy_import.lazy_import(
@@ -143,7 +146,7 @@ class BzrUploader:
             revid_path = self.branch.get_config_stack().get("upload_revid_location")
             try:
                 self._uploaded_revid = self._up_get_bytes(revid_path)
-            except transport.NoSuchFile:
+            except NoSuchFile:
                 # We have not uploaded to here.
                 self._uploaded_revid = revision.NULL_REVISION
         return self._uploaded_revid
@@ -153,7 +156,7 @@ class BzrUploader:
             try:
                 ignore_file_path = ".bzrignore-upload"
                 ignore_file = self.tree.get_file(ignore_file_path)
-            except transport.NoSuchFile:
+            except NoSuchFile:
                 ignored_patterns = []
             else:
                 ignored_patterns = ignores.parse_ignore_file(ignore_file)
@@ -204,7 +207,7 @@ class BzrUploader:
                         )
                     )
                 self._up_delete(relpath)
-        except errors.PathError:
+        except transport_errors.PathError:
             pass
 
     def upload_file_robustly(self, relpath, mode=None):
@@ -251,7 +254,7 @@ class BzrUploader:
             else:
                 # Ok the remote dir already exists, nothing to do
                 return
-        except errors.PathError:
+        except transport_errors.PathError:
             pass
         self.make_remote_dir(relpath, mode)
 
@@ -273,7 +276,7 @@ class BzrUploader:
             self._up_rmdir(relpath)
         # any kind of PathError would be OK, though we normally expect
         # DirectoryNotEmpty
-        except errors.PathError:
+        except transport_errors.PathError:
             self._pending_deletions.append(relpath)
 
     def finish_deletions(self):
@@ -336,7 +339,7 @@ class BzrUploader:
                 elif ie.kind == "symlink":
                     try:
                         self.upload_symlink_robustly(relpath, ie.symlink_target)
-                    except errors.TransportNotPossible:
+                    except transport_errors.TransportNotPossible:
                         if not self.quiet:
                             target = self.tree.path_content_summary(relpath)[3]
                             self.outf.write(
@@ -437,7 +440,7 @@ class BzrUploader:
                     target = self.tree.get_symlink_target(change.path[1])
                     try:
                         self.upload_symlink(change.path[1], target)
-                    except errors.TransportNotPossible:
+                    except transport_errors.TransportNotPossible:
                         if not self.quiet:
                             self.outf.write(
                                 "Not uploading symlink {} -> {}\n".format(
@@ -555,7 +558,7 @@ class cmd_upload(commands.Command):
                 has_wt = to_bzr_dir.has_workingtree()
             except errors.NotBranchError:
                 has_wt = False
-            except errors.NotLocalUrl:
+            except transport_errors.NotLocalUrl:
                 # The exception raised is a bit weird... but that's life.
                 has_wt = True
 

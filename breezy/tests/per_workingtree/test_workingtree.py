@@ -20,10 +20,12 @@ import errno
 import os
 from io import StringIO
 
+from dromedary import errors as transport_errors
+from dromedary.errors import NoSuchFile
+
 from ... import branch as _mod_branch
 from ... import config, controldir, errors, merge, osutils, tests, trace, urlutils
 from ... import revision as _mod_revision
-from ... import transport as _mod_transport
 from ...bzr import bzrdir
 from ...bzr.conflicts import ConflictList, ContentsConflict, TextConflict
 from ...bzr.inventory import Inventory
@@ -46,7 +48,7 @@ class TestWorkingTree(TestCaseWithWorkingTree):
             raise TestNotApplicable(
                 "only on trees that can be separate from their branch."
             )
-        except (errors.NoWorkingTree, errors.NotLocalUrl):
+        except (errors.NoWorkingTree, transport_errors.NotLocalUrl):
             pass
 
     def test_branch_builder(self):
@@ -334,7 +336,7 @@ class TestWorkingTree(TestCaseWithWorkingTree):
     def test_add_missing(self):
         # adding a msising file -> NoSuchFile
         wt = self.make_branch_and_tree(".")
-        self.assertRaises(_mod_transport.NoSuchFile, wt.add, "fpp")
+        self.assertRaises(NoSuchFile, wt.add, "fpp")
 
     def test_remove_verbose(self):
         # FIXME the remove api should not print or otherwise depend on the
@@ -1015,10 +1017,10 @@ class TestWorkingTree(TestCaseWithWorkingTree):
     def test_stored_kind_nonexistent(self):
         tree = self.make_branch_and_tree("tree")
         tree.lock_write()
-        self.assertRaises(_mod_transport.NoSuchFile, tree.stored_kind, "a")
+        self.assertRaises(NoSuchFile, tree.stored_kind, "a")
         self.addCleanup(tree.unlock)
         self.build_tree(["tree/a"])
-        self.assertRaises(_mod_transport.NoSuchFile, tree.stored_kind, "a")
+        self.assertRaises(NoSuchFile, tree.stored_kind, "a")
         tree.add(["a"])
         self.assertIs("file", tree.stored_kind("a"))
 
@@ -1038,12 +1040,12 @@ class TestWorkingTree(TestCaseWithWorkingTree):
         tree = self.make_branch_and_tree(".")
         tree.lock_write()
         self.addCleanup(tree.unlock)
-        self.assertRaises(_mod_transport.NoSuchFile, tree.get_file_sha1, "nonexistant")
+        self.assertRaises(NoSuchFile, tree.get_file_sha1, "nonexistant")
         self.build_tree(["file"])
         tree.add("file")
         tree.commit("foo")
         tree.remove("file")
-        self.assertRaises(_mod_transport.NoSuchFile, tree.get_file_sha1, "file")
+        self.assertRaises(NoSuchFile, tree.get_file_sha1, "file")
 
     def test_case_sensitive(self):
         """If filesystem is case-sensitive, tree should report this.

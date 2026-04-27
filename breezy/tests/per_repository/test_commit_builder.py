@@ -18,6 +18,8 @@
 
 import os
 
+from dromedary.local import file_kind
+
 from breezy import errors, osutils, repository, tests
 from breezy import revision as _mod_revision
 from breezy.bzr import inventorytree

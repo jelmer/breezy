@@ -17,9 +17,10 @@
 """Tests for the SSL support in the urllib HTTP transport."""
 
 import os
+import ssl
 
 from .. import config, tests, trace
-from ..transport.http import opt_ssl_ca_certs, ssl
+from ..config import option_registry
 
 
 class CaCertsConfigTests(tests.TestCaseInTempDir):
@@ -34,14 +35,15 @@ class CaCertsConfigTests(tests.TestCaseInTempDir):
     def test_specified(self):
         self.build_tree(["cacerts.pem"])
         path = os.path.join(self.test_dir, "cacerts.pem")
-        stack = self.get_stack("ssl.ca_certs = {}\n".format(path))
+        stack = self.get_stack(f"ssl.ca_certs = {path}\n")
         self.assertEqual(path, stack.get("ssl.ca_certs"))
 
     def test_specified_doesnt_exist(self):
         stack = self.get_stack("")
         # Disable the default value mechanism to force the behavior we want
+        opt = option_registry.get("ssl.ca_certs")
         self.overrideAttr(
-            opt_ssl_ca_certs, "default", os.path.join(self.test_dir, "nonexisting.pem")
+            opt, "default", os.path.join(self.test_dir, "nonexisting.pem")
         )
         self.warnings = []
 

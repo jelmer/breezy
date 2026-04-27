@@ -26,13 +26,45 @@ for a list of the available options.
 debug_flags = set()
 
 
+def debug_flag_enabled(flag):
+    """Return True if the given debug flag is enabled."""
+    return flag in debug_flags
+
+
+def get_debug_flags():
+    """Return a copy of the set of enabled debug flags."""
+    return set(debug_flags)
+
+
+def set_debug_flag(flag):
+    """Enable a debug flag."""
+    debug_flags.add(flag)
+
+
+def unset_debug_flag(flag):
+    """Disable a debug flag."""
+    debug_flags.discard(flag)
+
+
+def clear_debug_flags():
+    """Disable all debug flags."""
+    debug_flags.clear()
+
+
+def set_debug_flags(flags):
+    """Replace the set of enabled debug flags with the given iterable."""
+    clear_debug_flags()
+    for f in flags:
+        set_debug_flag(f)
+
+
 def set_debug_flags_from_config():
     """Turn on debug flags based on the global configuration."""
     from breezy import config
 
     c = config.GlobalStack()
     for f in c.get("debug_flags"):
-        debug_flags.add(f)
+        set_debug_flag(f)
 
 
 def set_trace():

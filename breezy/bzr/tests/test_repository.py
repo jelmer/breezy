@@ -24,6 +24,8 @@ also see this file.
 
 from stat import S_ISDIR
 
+from dromedary.errors import NoSuchFile
+
 import breezy
 from breezy import (
     controldir,
@@ -31,7 +33,6 @@ from breezy import (
     osutils,
     repository,
     tests,
-    transport,
     upgrade,
     workingtree,
 )
@@ -512,7 +513,7 @@ class TestRepositoryFormatKnit3(TestCaseWithTransport):
         tree.commit("Dull commit", rev_id=b"dull")
         revision_tree = tree.branch.repository.revision_tree(b"dull")
         with revision_tree.lock_read():
-            self.assertRaises(transport.NoSuchFile, revision_tree.get_file_lines, "")
+            self.assertRaises(NoSuchFile, revision_tree.get_file_lines, "")
         format = bzrdir.BzrDirMetaFormat1()
         format.repository_format = knitrepo.RepositoryFormatKnit3()
         upgrade.Convert(".", format)

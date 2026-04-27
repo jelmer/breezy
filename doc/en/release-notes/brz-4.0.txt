@@ -1,0 +1,17 @@
+####################
+Breezy Release Notes
+####################
+
+.. toctree::
+   :maxdepth: 1
+
+brz 4.0.0
+#########
+
+ * The transport layer has been extracted into a separate standalone
+   project, ``dromedary``. Breezy now depends on the external
+   ``dromedary`` package for its transport implementations (local,
+   sftp, http, memory, ssh, etc.) and URL utilities.
+
+..
+   vim: tw=74 ft=rst ff=unix

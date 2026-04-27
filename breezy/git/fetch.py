@@ -19,6 +19,7 @@
 import posixpath
 import stat
 
+from dromedary.errors import NoSuchFile
 from dulwich.object_store import tree_lookup_path
 from dulwich.objects import S_IFGITLINK, S_ISGITLINK, ZERO_SHA, Commit, Tag, Tree
 
@@ -34,7 +35,6 @@ from ..bzr.testament import StrictTestament3
 from ..bzr.versionedfile import ChunkedContentFactory
 from ..errors import BzrError
 from ..revision import NULL_REVISION
-from ..transport import NoSuchFile
 from ..tree import InterTree
 from ..tsort import topo_sort
 from .mapping import (

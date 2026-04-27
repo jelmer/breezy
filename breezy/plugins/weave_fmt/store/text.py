@@ -24,8 +24,9 @@ import gzip
 import os
 from io import BytesIO
 
+from dromedary.errors import FileExists, NoSuchFile
+
 from .... import osutils
-from ....transport import FileExists, NoSuchFile
 from . import TransportStore
 
 
