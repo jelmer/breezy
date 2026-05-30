@@ -94,9 +94,9 @@ class cmd_dump_btree(Command):
         # uncompressed header.
         bt, bytes = self._get_index_and_bytes(trans, basename)
         for page_idx, page_start in enumerate(
-            range(0, len(bytes), btree_index._PAGE_SIZE)
+            range(0, len(bytes), btree_index.PAGE_SIZE)
         ):
-            page_end = min(page_start + btree_index._PAGE_SIZE, len(bytes))
+            page_end = min(page_start + btree_index.PAGE_SIZE, len(bytes))
             page_bytes = bytes[page_start:page_end]
             if page_idx == 0:
                 self.outf.write("Root node:\n")
