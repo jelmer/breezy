@@ -106,3 +106,16 @@ fn test_access_normalized_filename() {
         Some((PathBuf::from("a/µ"), true))
     );
 }
+
+#[test]
+fn test_rand_chars() {
+    use crate::rand_chars;
+    assert_eq!(rand_chars(0), "");
+    let s = rand_chars(20);
+    assert_eq!(s.len(), 20);
+    assert!(
+        s.bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit()),
+        "unexpected characters in {s:?}"
+    );
+}

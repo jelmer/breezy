@@ -1,6 +1,5 @@
 use log::{debug, warn};
 use memchr::memchr;
-use rand::Rng;
 use std::borrow::Cow;
 
 pub fn is_well_formed_line(line: &[u8]) -> bool {
@@ -177,16 +176,13 @@ pub fn set_or_unset_env(
     Ok(ret)
 }
 
-const ALNUM: &str = "0123456789abcdefghijklmnopqrstuvwxyz";
+const ALNUM: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 
 pub fn rand_chars(num: usize) -> String {
+    use rand::seq::IndexedRandom;
     let mut rng = rand::rng();
-    let mut s = String::new();
-    for _ in 0..num {
-        let raw_byte = rng.random_range(0..256);
-        s.push(ALNUM.chars().nth(raw_byte % 36).unwrap());
-    }
-    s
+    let bytes: Vec<u8> = (0..num).map(|_| *ALNUM.choose(&mut rng).unwrap()).collect();
+    String::from_utf8(bytes).unwrap()
 }
 
 #[cfg(unix)]
