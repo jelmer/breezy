@@ -11,6 +11,48 @@ use patiencediff::{Opcode, SequenceMatcher};
 /// Number of context lines shown around a change by default.
 pub const DEFAULT_CONTEXT_AMOUNT: usize = 3;
 
+/// GNU diff style options as of diff v3.2.
+///
+/// If none of these appear in the caller's option list, `default_style_unified`
+/// adds `-u` so the output is a unified diff.
+pub const STYLE_OPTION_LIST: &[&str] = &[
+    "-c",
+    "-C",
+    "--context",
+    "-e",
+    "--ed",
+    "-f",
+    "--forward-ed",
+    "-q",
+    "--brief",
+    "--normal",
+    "-n",
+    "--rcs",
+    "-u",
+    "-U",
+    "--unified",
+    "-y",
+    "--side-by-side",
+    "-D",
+    "--ifdef",
+];
+
+/// Default to a unified diff style unless another style is already requested.
+///
+/// diff only honours one style; they do not override each other. This is only
+/// an approximate parser: an option is treated as a style if it starts with any
+/// entry of `STYLE_OPTION_LIST`, since a style can carry a directly-appended
+/// optarg. Appends `-u` when no style is present, and returns the list.
+pub fn default_style_unified(mut diff_opts: Vec<String>) -> Vec<String> {
+    let has_style = STYLE_OPTION_LIST
+        .iter()
+        .any(|s| diff_opts.iter().any(|opt| opt.starts_with(s)));
+    if !has_style {
+        diff_opts.push("-u".to_string());
+    }
+    diff_opts
+}
+
 fn header_range(start: usize, length: usize) -> Vec<u8> {
     format!("{},{}", start, length).into_bytes()
 }
@@ -196,6 +238,24 @@ mod tests {
     #[test]
     fn empty_is_none() {
         assert_eq!(internal_diff(b"old", &[], b"new", &[], 3), None);
+    }
+
+    #[test]
+    fn default_style_appends_u() {
+        assert_eq!(
+            default_style_unified(vec!["-a".to_string()]),
+            vec!["-a".to_string(), "-u".to_string()]
+        );
+    }
+
+    #[test]
+    fn default_style_keeps_existing() {
+        for style in STYLE_OPTION_LIST {
+            assert_eq!(
+                default_style_unified(vec![style.to_string()]),
+                vec![style.to_string()]
+            );
+        }
     }
 
     #[test]

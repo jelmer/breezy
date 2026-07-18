@@ -19,6 +19,8 @@ import_exception!(breezy.errors, NoWhoami);
 import_exception!(breezy.errors, LockCorrupt);
 import_exception!(breezy.errors, NoSuchTag);
 import_exception!(breezy.errors, TagAlreadyExists);
+import_exception!(breezy.errors, NoDiff);
+import_exception!(breezy.errors, BzrError);
 
 import_exception!(breezy.bugtracker, MalformedBugIdentifier);
 import_exception!(breezy.bugtracker, InvalidBugTrackerURL);
@@ -838,6 +840,224 @@ fn internal_diff(
     Ok(())
 }
 
+/// Append `-u` to `diff_opts` unless a diff style is already requested.
+#[pyfunction]
+fn default_style_unified(diff_opts: Vec<String>) -> Vec<String> {
+    breezy::diff::default_style_unified(diff_opts)
+}
+
+/// Spawn GNU `diff` on the two temp files and return (stdout, exit code).
+///
+/// With `capture_errors`, a minimal `LANG=C` environment is imposed so the
+/// output can be parsed; otherwise the inherited environment is used to produce
+/// a localised error for the user. Spawn failure maps to `NoDiff`.
+fn spawn_external_diff(diffcmd: &[String], capture_errors: bool) -> PyResult<(Vec<u8>, i32)> {
+    use std::process::{Command, Stdio};
+
+    let mut cmd = Command::new(&diffcmd[0]);
+    cmd.args(&diffcmd[1..])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped());
+    if capture_errors {
+        // Construct a minimal environment so diff speaks a parseable C locale.
+        cmd.env_clear();
+        if let Some(path) = std::env::var_os("PATH") {
+            cmd.env("PATH", path);
+        }
+        cmd.env("LANGUAGE", "C") // on win32 only LANGUAGE has effect
+            .env("LANG", "C")
+            .env("LC_ALL", "C")
+            .stderr(Stdio::piped());
+    } else {
+        cmd.stderr(Stdio::inherit());
+    }
+
+    let output = cmd.output().map_err(|e| NoDiff::new_err(e.to_string()))?;
+    // Mirror Python's Popen.returncode: negative signal number when the process
+    // was killed by a signal (no exit code).
+    let code = match output.status.code() {
+        Some(code) => code,
+        None => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                output.status.signal().map(|s| -s).unwrap_or(-1)
+            }
+            #[cfg(not(unix))]
+            {
+                -1
+            }
+        }
+    };
+    Ok((output.stdout, code))
+}
+
+/// Coerce a diff label, given as either `str` or `bytes`, to a `String`.
+///
+/// Labels are human-readable path labels and are always valid UTF-8 in
+/// practice; bytes are decoded as UTF-8.
+fn label_to_string(label: &Bound<'_, PyAny>) -> PyResult<String> {
+    match label.extract::<String>() {
+        Ok(s) => Ok(s),
+        Err(_) => Ok(String::from_utf8_lossy(&label.extract::<Vec<u8>>()?).into_owned()),
+    }
+}
+
+/// Display a diff by calling out to the external `diff` program.
+#[pyfunction]
+fn external_diff(
+    py: Python,
+    old_label: &Bound<'_, PyAny>,
+    oldlines: Vec<Vec<u8>>,
+    new_label: &Bound<'_, PyAny>,
+    newlines: Vec<Vec<u8>>,
+    to_file: Py<PyAny>,
+    diff_opts: Vec<String>,
+) -> PyResult<()> {
+    let old_label = label_to_string(old_label)?;
+    let new_label = label_to_string(new_label)?;
+
+    // Make sure our own output is properly ordered before the diff.
+    to_file.call_method0(py, "flush")?;
+
+    let tempfile = py.import("tempfile")?;
+    let make_temp = |prefix: &str| -> PyResult<(std::os::fd::RawFd, String)> {
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("prefix", prefix)?;
+        let res = tempfile.call_method("mkstemp", (), Some(&kwargs))?;
+        res.extract::<(std::os::fd::RawFd, String)>()
+    };
+    let (old_fd, old_abspath) = make_temp("brz-diff-old-")?;
+    let (new_fd, new_abspath) = make_temp("brz-diff-new-")?;
+
+    let result = external_diff_inner(
+        py,
+        old_fd,
+        &old_abspath,
+        &oldlines,
+        new_fd,
+        &new_abspath,
+        &newlines,
+        old_label,
+        new_label,
+        diff_opts,
+        &to_file,
+    );
+
+    for path in [&old_abspath, &new_abspath] {
+        match std::fs::remove_file(path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => log::warn!("Failed to delete temporary file: {} {}", path, e),
+        }
+    }
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+fn external_diff_inner(
+    py: Python,
+    old_fd: std::os::fd::RawFd,
+    old_abspath: &str,
+    oldlines: &[Vec<u8>],
+    new_fd: std::os::fd::RawFd,
+    new_abspath: &str,
+    newlines: &[Vec<u8>],
+    old_label: String,
+    new_label: String,
+    diff_opts: Vec<String>,
+    to_file: &Py<PyAny>,
+) -> PyResult<()> {
+    use std::os::fd::FromRawFd;
+
+    // mkstemp handed us owned fds; adopt them so the files are flushed/closed
+    // before diff reads them.
+    {
+        let mut old_f = unsafe { std::fs::File::from_raw_fd(old_fd) };
+        for line in oldlines {
+            old_f.write_all(line)?;
+        }
+        let mut new_f = unsafe { std::fs::File::from_raw_fd(new_fd) };
+        for line in newlines {
+            new_f.write_all(line)?;
+        }
+    }
+
+    let mut diffcmd: Vec<String> = vec![
+        "diff".into(),
+        "--label".into(),
+        old_label,
+        old_abspath.into(),
+        "--label".into(),
+        new_label,
+        new_abspath.into(),
+        "--binary".into(),
+    ];
+    diffcmd.extend(breezy::diff::default_style_unified(diff_opts));
+
+    let (mut out, rc) = spawn_external_diff(&diffcmd, true)?;
+    // internal_diff() adds a trailing newline, add one here for consistency.
+    out.push(b'\n');
+
+    if rc == 2 {
+        // diff gives retcode 2 for all sorts of errors; one is "Binary files
+        // differ", which is not a real error. Bad options could also be it.
+        let lang_c_out = out;
+
+        // Rerun without the forced C locale so the user gets an i18n error.
+        let (native_out, native_rc) = spawn_external_diff(&diffcmd, false)?;
+        let mut native_out = native_out;
+        native_out.push(b'\n');
+        write_bytes(py, to_file, &native_out)?;
+        if native_rc != 2 {
+            return Err(BzrError::new_err(format!(
+                "external diff failed with exit code 2 when run with LANG=C and \
+                 LC_ALL=C, but not when run natively: {:?}",
+                diffcmd
+            )));
+        }
+
+        let first_line = lang_c_out.split(|&b| b == b'\n').next().unwrap_or(b"");
+        // Starting with diffutils 2.8.4 the word "binary" was dropped.
+        if is_binary_files_differ(first_line) {
+            // Binary files differ, just return.
+            return Ok(());
+        }
+        return Err(BzrError::new_err(format!(
+            "external diff failed with exit code 2; command: {:?}",
+            diffcmd
+        )));
+    }
+
+    write_bytes(py, to_file, &out)?;
+    if rc != 0 && rc != 1 {
+        // returns 1 if files differ; that's OK.
+        let msg = if rc < 0 {
+            format!("signal {}", -rc)
+        } else {
+            format!("exit code {}", rc)
+        };
+        return Err(BzrError::new_err(format!(
+            "external diff failed with {}; command: {:?}",
+            msg, diffcmd
+        )));
+    }
+    Ok(())
+}
+
+fn write_bytes(py: Python, to_file: &Py<PyAny>, data: &[u8]) -> PyResult<()> {
+    to_file.call_method1(py, "write", (PyBytes::new(py, data),))?;
+    Ok(())
+}
+
+/// Match diff's "Binary files ... differ" / "Files ... differ" report,
+/// case-insensitively, ignoring a leading "binary " that older diffutils emit.
+fn is_binary_files_differ(first_line: &[u8]) -> bool {
+    let lower: Vec<u8> = first_line.to_ascii_lowercase();
+    let rest = lower.strip_prefix(b"binary ").unwrap_or(&lower);
+    rest.starts_with(b"files") && rest.ends_with(b"differ")
+}
+
 #[pymodule]
 fn _cmd_rs(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     // Route Rust `log` records to Python's `logging` module so that fixtures
@@ -929,6 +1149,8 @@ fn _cmd_rs(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     let diffm = PyModule::new(py, "diff")?;
     diffm.add_function(wrap_pyfunction!(unified_diff_bytes, &diffm)?)?;
     diffm.add_function(wrap_pyfunction!(internal_diff, &diffm)?)?;
+    diffm.add_function(wrap_pyfunction!(external_diff, &diffm)?)?;
+    diffm.add_function(wrap_pyfunction!(default_style_unified, &diffm)?)?;
     m.add_submodule(&diffm)?;
 
     // PyO3 submodule hack for proper import support

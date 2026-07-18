@@ -24,7 +24,6 @@ various diff display formats.
 import contextlib
 import difflib
 import os
-import re
 import sys
 
 from .lazy_import import lazy_import
@@ -218,43 +217,6 @@ def unified_diff_bytes(
                     yield b"+" + line
 
 
-def _spawn_external_diff(diffcmd, capture_errors=True):
-    """Spawn the external diff process, and return the child handle.
-
-    :param diffcmd: The command list to spawn
-    :param capture_errors: Capture stderr as well as setting LANG=C
-        and LC_ALL=C. This lets us read and understand the output of diff,
-        and respond to any errors.
-    :return: A Popen object.
-    """
-    if capture_errors:
-        # construct minimal environment
-        env = {}
-        path = os.environ.get("PATH")
-        if path is not None:
-            env["PATH"] = path
-        env["LANGUAGE"] = "C"  # on win32 only LANGUAGE has effect
-        env["LANG"] = "C"
-        env["LC_ALL"] = "C"
-        stderr = subprocess.PIPE
-    else:
-        env = None
-        stderr = None
-
-    try:
-        pipe = subprocess.Popen(
-            diffcmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=stderr,
-            env=env,
-        )
-    except FileNotFoundError as e:
-        raise errors.NoDiff(str(e)) from e
-
-    return pipe
-
-
 # diff style options as of GNU diff v3.2
 style_option_list = [
     "-c",
@@ -282,141 +244,23 @@ style_option_list = [
 def default_style_unified(diff_opts):
     """Default to unified diff style if alternative not specified in diff_opts.
 
-        diff only allows one style to be specified; they don't override.
-        Note that some of these take optargs, and the optargs can be
-        directly appended to the options.
-        This is only an approximate parser; it doesn't properly understand
-        the grammar.
+    diff only allows one style to be specified; they don't override.
+    Note that some of these take optargs, and the optargs can be
+    directly appended to the options.
+    This is only an approximate parser; it doesn't properly understand
+    the grammar.
 
     :param diff_opts: List of options for external (GNU) diff.
     :return: List of options with default style=='unified'.
     """
-    for s in style_option_list:
-        for j in diff_opts:
-            if j.startswith(s):
-                break
-        else:
-            continue
-        break
-    else:
-        diff_opts.append("-u")
-    return diff_opts
+    return _diff_rs.default_style_unified(diff_opts or [])
 
 
 def external_diff(old_label, oldlines, new_label, newlines, to_file, diff_opts):
     """Display a diff by calling out to the external diff program."""
-    import tempfile
-
-    # make sure our own output is properly ordered before the diff
-    to_file.flush()
-
-    oldtmp_fd, old_abspath = tempfile.mkstemp(prefix="brz-diff-old-")
-    newtmp_fd, new_abspath = tempfile.mkstemp(prefix="brz-diff-new-")
-    oldtmpf = os.fdopen(oldtmp_fd, "wb")
-    newtmpf = os.fdopen(newtmp_fd, "wb")
-
-    try:
-        # TODO: perhaps a special case for comparing to or from the empty
-        # sequence; can just use /dev/null on Unix
-
-        # TODO: if either of the files being compared already exists as a
-        # regular named file (e.g. in the working directory) then we can
-        # compare directly to that, rather than copying it.
-
-        oldtmpf.writelines(oldlines)
-        newtmpf.writelines(newlines)
-
-        oldtmpf.close()
-        newtmpf.close()
-
-        if not diff_opts:
-            diff_opts = []
-        if sys.platform == "win32":
-            # Popen doesn't do the proper encoding for external commands
-            # Since we are dealing with an ANSI api, use mbcs encoding
-            old_label = old_label.encode("mbcs")
-            new_label = new_label.encode("mbcs")
-        diffcmd = [
-            "diff",
-            "--label",
-            old_label,
-            old_abspath,
-            "--label",
-            new_label,
-            new_abspath,
-            "--binary",
-        ]
-
-        diff_opts = default_style_unified(diff_opts)
-
-        if diff_opts:
-            diffcmd.extend(diff_opts)
-
-        pipe = _spawn_external_diff(diffcmd, capture_errors=True)
-        out, _err = pipe.communicate()
-        rc = pipe.returncode
-
-        # internal_diff() adds a trailing newline, add one here for consistency
-        out += b"\n"
-        if rc == 2:
-            # 'diff' gives retcode == 2 for all sorts of errors
-            # one of those is 'Binary files differ'.
-            # Bad options could also be the problem.
-            # 'Binary files' is not a real error, so we suppress that error.
-            lang_c_out = out
-
-            # Since we got here, we want to make sure to give an i18n error
-            pipe = _spawn_external_diff(diffcmd, capture_errors=False)
-            out, _err = pipe.communicate()
-
-            # Write out the new i18n diff response
-            to_file.write(out + b"\n")
-            if pipe.returncode != 2:
-                raise errors.BzrError(
-                    "external diff failed with exit code 2"
-                    " when run with LANG=C and LC_ALL=C,"
-                    f" but not when run natively: {diffcmd!r}"
-                )
-
-            first_line = lang_c_out.split(b"\n", 1)[0]
-            # Starting with diffutils 2.8.4 the word "binary" was dropped.
-            m = re.match(b"^(binary )?files.*differ$", first_line, re.I)
-            if m is None:
-                raise errors.BzrError(
-                    f"external diff failed with exit code 2; command: {diffcmd!r}"
-                )
-            else:
-                # Binary files differ, just return
-                return
-
-        # If we got to here, we haven't written out the output of diff
-        # do so now
-        to_file.write(out)
-        if rc not in (0, 1):
-            # returns 1 if files differ; that's OK
-            msg = "signal %d" % -rc if rc < 0 else "exit code %d" % rc
-
-            raise errors.BzrError(
-                f"external diff failed with {msg}; command: {diffcmd!r}"
-            )
-
-    finally:
-        oldtmpf.close()  # and delete
-        newtmpf.close()
-
-        def cleanup(path):
-            # Warn in case the file couldn't be deleted (in case windows still
-            # holds the file open, but not if the files have already been
-            # deleted)
-            try:
-                os.remove(path)
-            except FileNotFoundError:
-                pass
-            except OSError as e:
-                warning("Failed to delete temporary file: %s %s", path, e)
-
-        cleanup(old_abspath)
-        cleanup(new_abspath)
+    _diff_rs.external_diff(
+        old_label, oldlines, new_label, newlines, to_file, diff_opts or []
+    )
 
 
 def get_trees_and_branches_to_diff_locked(
