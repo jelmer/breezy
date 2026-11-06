@@ -96,6 +96,17 @@ class GitWorkingTreeTests(TestCaseWithTransport):
         self.tree._ignoremanager = None
         self.assertTrue(self.tree.is_ignored("a"))
 
+    def test_is_ignored_inside_ignored_directory(self):
+        # https://bugs.launchpad.net/brz/+bug/2173039
+        self.build_tree(["a/", "a/b/", "a/b/c"])
+        self.build_tree_contents([(".gitignore", "a\n")])
+        self.tree._ignoremanager = None
+        self.assertEqual(b"a", self.tree.is_ignored("a/b"))
+        self.assertEqual(b"a", self.tree.is_ignored("a/b/c"))
+        self.build_tree_contents([(".gitignore", "a/\n")])
+        self.tree._ignoremanager = None
+        self.assertEqual(b"a/", self.tree.is_ignored("a/b/c"))
+
     def test_add_submodule_dir(self):
         subtree = self.make_branch_and_tree("asub", format="git")
         subtree.commit("Empty commit")

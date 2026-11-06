@@ -78,6 +78,11 @@ Bug Fixes
  * Hooks installed lazily for ``breezy.forge.MergeProposalBuilder.hooks``
    now reach it. (Jelmer Vernooĳ)
 
+ * In git-format working trees, ``is_ignored`` now considers whether a parent
+   directory is excluded, so files beneath a directory ignored by a bare
+   name (e.g. ``node_modules``) are no longer reported as unknown by
+   ``brz status``. (Jelmer Vernooĳ, #2173039)
+
 Documentation
 *************
 

@@ -1320,11 +1320,17 @@ class GitWorkingTree(MutableGitIndexTree, workingtree.WorkingTree):
         filename = filename.lstrip("/")
         ignore_manager = self._get_ignore_manager()
         ps = list(ignore_manager.find_matching(filename))
-        if not ps:
-            return None
-        if not ps[-1].is_exclude:
-            return None
-        return bytes(ps[-1])
+        if ps and ps[-1].is_exclude:
+            return bytes(ps[-1])
+        # Git treats a path as ignored once any parent directory matches an
+        # exclude pattern, even if the path itself has no matching rule.
+        parts = filename.rstrip("/").split("/")
+        for i in range(1, len(parts)):
+            parent = "/".join(parts[:i]) + "/"
+            parent_ps = list(ignore_manager.find_matching(parent))
+            if parent_ps and parent_ps[-1].is_exclude:
+                return bytes(parent_ps[-1])
+        return None
 
     def _get_ignore_manager(self):
         ignoremanager = getattr(self, "_ignoremanager", None)
