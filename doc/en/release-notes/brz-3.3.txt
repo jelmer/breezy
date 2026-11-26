@@ -83,7 +83,6 @@ brz 3.3.26
    kind recorded in the tree is used instead.
    (#729751, Jelmer Vernooĳ)
 
-<<<<<<< HEAD
  * The "branches have diverged" error from ``brz push`` now names
    both the local and remote branches and suggests ``brz missing``,
    ``brz merge`` and ``brz push --overwrite`` as next steps, instead
@@ -152,6 +151,10 @@ brz 3.3.26
  * ``brz help diff`` now points to ``brz status -r X..Y`` for users
    looking for a per-file summary like ``svn diff --summarize``.
    (#532600, Jelmer Vernooĳ)
+
+ * ``brz help resolve`` now explains what ``--action=ARG`` accepts
+   and notes that ``--done``, ``--take-this`` and ``--take-other``
+   are shorthands. (#652336, Jelmer Vernooĳ)
 
 brz 3.3.25
 ##########
