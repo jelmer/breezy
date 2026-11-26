@@ -840,6 +840,12 @@ topic_registry.register(
     "eol", _load_from_file, "Information on end-of-line handling", SECT_CONCEPT
 )
 topic_registry.register(
+    "file-ids",
+    _load_from_file,
+    "Information on file ids in Bazaar branches",
+    SECT_CONCEPT,
+)
+topic_registry.register(
     "formats",
     _storage_formats,
     "Information on choosing a storage format",

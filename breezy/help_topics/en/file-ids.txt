@@ -1,0 +1,21 @@
+File IDs
+========
+
+In Bazaar branches, each versioned file and directory has a *file id*,
+an internal identifier assigned when it is added. The file id stays the
+same across renames so Breezy can track history across renames and
+merges.
+
+File ids only exist for Bazaar branches. Branches in other version
+control systems supported by Breezy, such as Git, do not have file ids.
+
+Normally Breezy generates a new unique file id whenever a file is added.
+If the same logical file is added independently in two Bazaar branches
+that will be merged later, the two copies receive different file ids and
+merging them produces a conflict. ``brz add --file-ids-from`` can be
+used to reuse the file ids of matching paths in another tree instead;
+this is also useful when merging another project into a subdirectory of
+an existing branch.
+
+You can inspect file ids with ``brz inventory --show-ids`` or
+``brz log --show-ids``.

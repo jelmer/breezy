@@ -74,8 +74,8 @@ brz 3.3.26
    produce conflicts without touching the working tree, and exits
    with status 1 if any would occur. (#409643, Jelmer Vernooĳ)
 
- * ``brz help add`` briefly explains what a file id is before mentioning
-   ``--file-ids-from``. (#505086, Jelmer Vernooĳ)
+ * Add a ``file-ids`` help topic explaining Bazaar file ids, and reference
+   it from ``brz help add``. (#505086, Jelmer Vernooĳ)
 
 brz 3.3.25
 ##########
