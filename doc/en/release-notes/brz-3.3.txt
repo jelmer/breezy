@@ -172,6 +172,11 @@ brz 3.3.26
    matches both tracked and untracked files.
    (#541676, Jelmer Vernooĳ)
 
+ * ``brz ignore --unknowns`` adds every currently unknown file in the
+   tree to ``.bzrignore``, as a one shot alternative to
+   ``brz unknowns | xargs -n 1 brz ignore``.
+   (#516674, Jelmer Vernooĳ)
+
 brz 3.3.25
 ##########
 
