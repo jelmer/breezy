@@ -849,6 +849,12 @@ topic_registry.register(
     "patterns", _load_from_file, "Information on the pattern syntax", SECT_CONCEPT
 )
 topic_registry.register(
+    "plugins",
+    _load_from_file,
+    "How to install and use Breezy plugins",
+    SECT_CONCEPT,
+)
+topic_registry.register(
     "repositories",
     _repositories,
     "Basic information on shared repositories.",

@@ -74,6 +74,9 @@ brz 3.3.26
    produce conflicts without touching the working tree, and exits
    with status 1 if any would occur. (#409643, Jelmer Vernooĳ)
 
+ * ``brz help plugins`` is now a help topic that describes how plugins
+   are discovered, installed and listed. (#107623, Jelmer Vernooĳ)
+
 brz 3.3.25
 ##########
 

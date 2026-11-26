@@ -1,0 +1,51 @@
+Plugins
+=======
+
+Plugins are Python packages that extend Breezy, adding new commands,
+formats, hooks, transports or UI changes. They are distributed
+independently of Breezy itself; the Breezy project maintains a list of
+plugins at:
+
+    https://www.breezy-vcs.org/doc/plugins/en/
+
+Installing plugins
+------------------
+
+A plugin is a directory (or Python package) named ``brz-<plugin>`` for
+the current user, or ``breezy.plugins.<plugin>`` when installed as a
+Python module. Breezy searches the following locations in order:
+
+* Any directory on ``BRZ_PLUGIN_PATH`` (colon-separated on Unix,
+  semicolon-separated on Windows). The special values ``-user`` /
+  ``-core`` / ``-site`` remove the corresponding default from the
+  search path.
+
+* The user plugin directory, usually ``~/.config/breezy/plugins`` on
+  Unix and ``%APPDATA%\breezy\plugins`` on Windows.
+
+* The installed Breezy ``plugins`` directory.
+
+* Any Python package in a ``breezy.plugins`` namespace package
+  (distributions that ship plugins as ordinary Python packages use
+  this).
+
+Listing plugins
+---------------
+
+Use ``brz plugins`` to list loaded plugins and their versions. Pass
+``--verbose`` to also show each plugin's docstring and path.
+
+Writing plugins
+---------------
+
+Plugins are written as Python packages that register commands,
+formats or hooks when imported. See the "Writing a plugin" chapter of
+the Breezy user guide for details.
+
+Disabling plugins
+-----------------
+
+Set ``BRZ_DISABLE_PLUGINS`` to a colon- or semicolon-separated list of
+plugin names to prevent Breezy from loading them, or remove the
+appropriate default from ``BRZ_PLUGIN_PATH`` using the ``-user``,
+``-core`` or ``-site`` tokens.

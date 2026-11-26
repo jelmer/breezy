@@ -17,6 +17,8 @@
 
 """Black-box tests for brz help."""
 
+import re
+
 from breezy import config, i18n, tests
 from breezy.tests.test_i18n import ZzzTranslations
 
@@ -37,6 +39,17 @@ class TestHelp(tests.TestCaseWithTransport):
         self.assertContainsRe(out, "topics")
         self.assertContainsRe(out, "commands")
         self.assertContainsRe(out, "revisionspec")
+
+    def test_help_plugins(self):
+        """'brz help plugins' describes the plugin system."""
+        out, _err = self.run_bzr("help plugins")
+        self.assertContainsRe(out, "Plugins")
+        self.assertContainsRe(out, "BRZ_PLUGIN_PATH")
+
+    def test_help_topics_lists_plugins(self):
+        """``brz help topics`` lists 'plugins' as a help topic."""
+        out, _err = self.run_bzr("help topics")
+        self.assertContainsRe(out, r"^plugins", flags=re.MULTILINE)
 
     def test_help_revisionspec(self):
         """Smoke test for 'brz help revisionspec'."""
