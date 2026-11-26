@@ -160,6 +160,11 @@ brz 3.3.26
    lists the branches in the repository rather than returning an
    empty list. (#1174344, Jelmer Vernooĳ)
 
+ * ``brz commit -m DIR`` no longer prints "The commit message is a file
+   name" when ``DIR`` happens to be an existing directory: ``--file``
+   cannot read its input from a directory so the suggestion was
+   misleading. (#1012115, Jelmer Vernooĳ)
+
 brz 3.3.25
 ##########
 
