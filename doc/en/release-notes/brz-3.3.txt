@@ -165,6 +165,13 @@ brz 3.3.26
    cannot read its input from a directory so the suggestion was
    misleading. (#1012115, Jelmer Vernooĳ)
 
+ * ``brz revert`` accepts ``--ignore-unversioned`` to silently skip
+   unversioned paths rather than failing with
+   ``Path(s) are not versioned``. This makes shell globs such as
+   ``brz revert --ignore-unversioned *.txt`` usable when the glob
+   matches both tracked and untracked files.
+   (#541676, Jelmer Vernooĳ)
+
 brz 3.3.25
 ##########
 
