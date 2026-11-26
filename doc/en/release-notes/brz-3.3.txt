@@ -143,6 +143,11 @@ brz 3.3.26
    points at ``BZR_REMOTE_PATH``/``bzr_remote_path`` for non-``$PATH``
    installs. (#583938, Jelmer Vernooĳ)
 
+ * ``brz help <user-alias>`` now shows the help of the aliased command
+   as well as the ``'brz <user-alias>' is an alias for ...`` line,
+   matching the behaviour of builtin aliases like ``brz help st``.
+   (#621643, Jelmer Vernooĳ)
+
 brz 3.3.25
 ##########
 
