@@ -98,6 +98,10 @@ brz 3.3.26
    ``-r X..Y`` means and how a cherrypick differs from a regular
    merge. (#211122, Jelmer Vernooĳ)
 
+ * Add ``brz untag TAG_NAME``, equivalent to ``brz tag --delete
+   TAG_NAME``, matching the ``brz commit`` / ``brz uncommit`` naming
+   pair. (#1083172, Jelmer Vernooĳ)
+
 brz 3.3.25
 ##########
 

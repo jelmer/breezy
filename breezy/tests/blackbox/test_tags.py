@@ -106,6 +106,14 @@ class TestTagging(TestCaseWithTransport):
         )
         self.assertContainsRe(err, "cannot be combined")
 
+    def test_untag_removes_tag(self):
+        tree = self.make_branch_and_tree("branch")
+        tree.commit(allow_pointless=True, message="first", rev_id=b"first-revid")
+        self.run_bzr("tag -rrevid:first-revid -d branch mytag")
+        _out, err = self.run_bzr("untag -d branch mytag")
+        self.assertContainsRe(err, r"Deleted tag mytag\.")
+        self.assertEqual({}, Branch.open("branch").tags.get_tag_dict())
+
     def test_branch_push_pull_merge_copies_tags(self):
         t = self.make_branch_and_tree("branch1")
         t.commit(allow_pointless=True, message="initial commit", rev_id=b"first-revid")
