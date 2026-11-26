@@ -95,6 +95,11 @@ class TestHelp(tests.TestCaseWithTransport):
         self.assertNotContainsRe(out, r"Documents and Settings")
         self.assertNotContainsRe(out, r"\.bazaar")
 
+    def test_help_add_explains_file_id(self):
+        """``brz help add`` briefly describes the file-id concept."""
+        out, _err = self.run_bzr("help add")
+        self.assertContainsRe(out, r"file id.*internal identifier")
+
     def test_help_commands(self):
         dash_help = self.run_bzr("--help commands")[0]
         commands = self.run_bzr("help commands")[0]
