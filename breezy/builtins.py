@@ -727,16 +727,17 @@ class cmd_add(Command):
     --dry-run will show which files would be added, but not actually
     add them.
 
-    Each versioned file has a *file id*, an internal identifier that
-    stays the same across renames so Breezy can track history across
-    renames and merges. ``--file-ids-from`` makes new files reuse the
-    file ids of matching paths in another tree. It looks up ids trying
-    to find a matching parent directory with the same filename, and
-    then by pure path. This option is rarely needed but can be useful
-    when adding the same logical file into two branches that will be
-    merged later (without showing the two different adds as a
-    conflict). It is also useful when merging another project into a
-    subdirectory of this one.
+    In Bazaar branches, each versioned file has a *file id*, an internal
+    identifier that stays the same across renames so Breezy can track
+    history across renames and merges. Branches in other version control
+    systems supported by Breezy, such as Git, do not have file ids.
+    ``--file-ids-from`` makes new files reuse the file ids of matching
+    paths in another tree. It looks up ids trying to find a matching
+    parent directory with the same filename, and then by pure path. This
+    option is rarely needed but can be useful when adding the same
+    logical file into two branches that will be merged later (without
+    showing the two different adds as a conflict). It is also useful
+    when merging another project into a subdirectory of this one.
 
     Any files matching patterns in the ignore list will not be added
     unless they are explicitly mentioned.

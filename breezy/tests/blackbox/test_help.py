@@ -98,7 +98,10 @@ class TestHelp(tests.TestCaseWithTransport):
     def test_help_add_explains_file_id(self):
         """``brz help add`` briefly describes the file-id concept."""
         out, _err = self.run_bzr("help add")
-        self.assertContainsRe(out, r"file id.*internal identifier")
+        self.assertContainsRe(
+            out, r"(?s)Bazaar branches.*file id.*internal\s+identifier"
+        )
+        self.assertContainsRe(out, r"(?s)Git.*do not have file ids")
 
     def test_help_commands(self):
         dash_help = self.run_bzr("--help commands")[0]
