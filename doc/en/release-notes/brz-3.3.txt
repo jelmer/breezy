@@ -116,6 +116,11 @@ brz 3.3.26
    also raised when the file does not decode in the chosen encoding.
    (#520604, Jelmer Vernooĳ)
 
+ * ``brz unshelve`` now accepts ``--show-base`` to include the base
+   revision text in any text conflicts it produces, matching the
+   option already supported by ``brz update`` and ``brz merge``.
+   (#1011641, Jelmer Vernooĳ)
+
 brz 3.3.25
 ##########
 
