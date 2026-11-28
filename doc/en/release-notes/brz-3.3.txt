@@ -102,6 +102,11 @@ brz 3.3.26
    every registered URL-prefix directory service (``lp:``, ``co:``,
    ``github:``, ...). (#262969, Jelmer Vernooĳ)
 
+ * The user guide gained a "Content filters" page that summarises
+   how to configure line-ending conversion through the rules file,
+   so users don't have to piece it together from the reference help.
+   (#493912, Jelmer Vernooĳ)
+
 brz 3.3.25
 ##########
 
