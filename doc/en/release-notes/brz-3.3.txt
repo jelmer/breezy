@@ -121,6 +121,9 @@ brz 3.3.26
    option already supported by ``brz update`` and ``brz merge``.
    (#1011641, Jelmer Vernooĳ)
 
+ * ``brz status`` accepts ``--all`` / ``-A`` to also list versioned
+   files that have not changed. (#507737, Jelmer Vernooĳ)
+
 brz 3.3.25
 ##########
 
