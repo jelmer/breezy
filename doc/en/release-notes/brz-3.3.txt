@@ -83,6 +83,7 @@ brz 3.3.26
    kind recorded in the tree is used instead.
    (#729751, Jelmer Vernooĳ)
 
+<<<<<<< HEAD
  * The "branches have diverged" error from ``brz push`` now names
    both the local and remote branches and suggests ``brz missing``,
    ``brz merge`` and ``brz push --overwrite`` as next steps, instead
@@ -147,6 +148,10 @@ brz 3.3.26
    as well as the ``'brz <user-alias>' is an alias for ...`` line,
    matching the behaviour of builtin aliases like ``brz help st``.
    (#621643, Jelmer Vernooĳ)
+
+ * ``brz help diff`` now points to ``brz status -r X..Y`` for users
+   looking for a per-file summary like ``svn diff --summarize``.
+   (#532600, Jelmer Vernooĳ)
 
 brz 3.3.25
 ##########
