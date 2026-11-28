@@ -4052,6 +4052,12 @@ class cmd_commit(Command):
             "system do not push data that can not be natively "
             "represented.",
         ),
+        Option(
+            "message-encoding",
+            type=str,
+            help="Encoding used to decode the --file commit message "
+            "(default: user encoding).",
+        ),
     ]
     aliases = ["ci", "checkin"]
 
@@ -4115,6 +4121,7 @@ class cmd_commit(Command):
         exclude=None,
         commit_time=None,
         lossy=False,
+        message_encoding=None,
     ):
         import itertools
 
@@ -4188,8 +4195,18 @@ class cmd_commit(Command):
         def get_message(commit_obj):
             """Callback to get commit message."""
             if file:
+                encoding = message_encoding or osutils.get_user_encoding()
                 with open(file, "rb") as f:
-                    my_message = f.read().decode(osutils.get_user_encoding())
+                    try:
+                        my_message = f.read().decode(encoding)
+                    except UnicodeDecodeError as exc:
+                        raise errors.CommandError(
+                            gettext(
+                                "Commit message file %s is not valid %s: %s. "
+                                "Try --message-encoding."
+                            )
+                            % (file, encoding, exc)
+                        ) from exc
             elif message is not None:
                 my_message = message
             else:

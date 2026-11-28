@@ -111,6 +111,11 @@ brz 3.3.26
    user error instead of a traceback.
    (#703270, Jelmer Vernooĳ)
 
+ * ``brz commit`` accepts ``--message-encoding`` to pick the encoding
+   used to decode the file passed with ``--file``. A clearer error is
+   also raised when the file does not decode in the chosen encoding.
+   (#520604, Jelmer Vernooĳ)
+
 brz 3.3.25
 ##########
 
